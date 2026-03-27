@@ -34,22 +34,28 @@ export default function WorkspacePage() {
     fetchTasks();
   }, [id, session]);
 
-  const handleChatParams = async (e) => {
-    if (e.key === 'Enter' && chatPrompt.trim()) {
-      setChatting(true);
-      setAiSummary('');
-      try {
-        const data = await workspaceChat(id, chatPrompt);
-        if (data.summary) {
-            setAiSummary(data.summary);
-            fetchTasks();
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setChatting(false);
-        setChatPrompt('');
+  const sendChat = async () => {
+    if (!chatPrompt.trim() || chatting) return;
+
+    setChatting(true);
+    setAiSummary('');
+    try {
+      const data = await workspaceChat(id, chatPrompt);
+      if (data.summary) {
+          setAiSummary(data.summary);
+          fetchTasks();
       }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setChatting(false);
+      setChatPrompt('');
+    }
+  };
+
+  const handleChatParams = (e) => {
+    if (e.key === 'Enter') {
+      sendChat();
     }
   };
 
@@ -133,7 +139,13 @@ export default function WorkspacePage() {
               onKeyDown={handleChatParams}
               disabled={chatting}
             />
-            <button style={styles.sendBtn} disabled={!chatPrompt.trim() || chatting}><ArrowRight size={14} /></button>
+            <button 
+              style={styles.sendBtn} 
+              disabled={!chatPrompt.trim() || chatting}
+              onClick={sendChat}
+            >
+              <ArrowRight size={14} />
+            </button>
           </div>
         </div>
       </div>
