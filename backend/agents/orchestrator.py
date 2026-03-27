@@ -1,5 +1,5 @@
 from langgraph.graph import StateGraph, START, END
-from typing import TypedDict, List
+from typing import TypedDict, List, Optional
 import agents.analyzer as analyzer
 import agents.fixer as fixer
 import agents.validator as validator
@@ -157,9 +157,14 @@ class OrchestratorAgent:
         
         # Commit and push
         try:
-            from tools.git_ops import commit_and_push
+            import git
+            from tools.git_ops import create_branch, commit_and_push
+            repo = git.Repo(state["repo_path"])
             branch_name = f"{state['team_name']}_{state['leader_name']}_AI_Fix"
-            commit_and_push(state["repo_path"], "[AI-AGENT] Applied autonomous fixes", branch_name)
+            create_branch(repo, branch_name)
+            changed_files = [f["file"] for f in state["fixes_applied"] if f.get("file")]
+            if changed_files:
+                commit_and_push(repo, "Applied autonomous fixes", changed_files)
             emit(run_id, "GitAgent", f"Pushed fixes to branch {branch_name}", "COMMIT_DONE")
         except Exception as e:
             emit(run_id, "GitAgent", f"Git push failed: {str(e)}", "COMMIT_FAILED")

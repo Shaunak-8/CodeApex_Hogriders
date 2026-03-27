@@ -1,4 +1,7 @@
 from tools.sandbox import E2BSandbox
+import tempfile
+import subprocess
+import os
 
 class ValidatorAgent:
     def __init__(self):
@@ -24,6 +27,38 @@ class ValidatorAgent:
         }
 
 def validate_fix(fix: str, failure) -> bool:
-    agent = ValidatorAgent()
-    result = agent.validate(".", {}, {})
-    return result.get("decision") == "ACCEPT"
+    """Validate a generated fix by checking syntax and basic correctness."""
+    # 1. Non-empty check
+    if not fix or fix.strip() == "" or fix.strip() == "pass":
+        return False
+
+    # 2. Syntax check — write to temp file and py_compile
+    try:
+        fd, tmp_path = tempfile.mkstemp(suffix=".py")
+        with os.fdopen(fd, "w") as f:
+            f.write(fix)
+        
+        result = subprocess.run(
+            ["python3", "-m", "py_compile", tmp_path],
+            capture_output=True, text=True, timeout=10
+        )
+        os.unlink(tmp_path)
+        
+        if result.returncode != 0:
+            print(f"Syntax validation failed: {result.stderr}")
+            return False
+    except Exception as e:
+        print(f"Validation error: {e}")
+        # Clean up temp file if it exists
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+        return False
+
+    # 3. Basic relevance check — fix should not be identical to error message
+    if hasattr(failure, 'message') and fix.strip() == failure.message.strip():
+        return False
+
+    return True
+

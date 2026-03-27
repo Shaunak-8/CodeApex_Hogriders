@@ -36,14 +36,13 @@ class AnalyzerAgent:
 
     def _deduplicate(self, failures):
         seen = {}
-        unique = []
         for f in failures:
             key = f"{f['file']}_{f['bug_type']}"
-            if key not in grouped:
-                grouped[key] = []
-            grouped[key].append(f)
+            if key not in seen:
+                seen[key] = []
+            seen[key].append(f)
             
-        return [g[0] for g in grouped.values()]
+        return [g[0] for g in seen.values()]
 
 def parse_failure(raw_output: str) -> Optional[FailureRecord]:
     file_name = "unknown_file.py"
