@@ -28,19 +28,20 @@ async def get_user_repositories():
         print(f"Error in get_user_repositories: {e}")
         raise
             
-        repos = response.json()
-        
-        # Format for frontend consumption
-        return [
-            {
-                "id": repo["id"],
-                "name": repo["name"],
-                "full_name": repo["full_name"],
-                "private": repo["private"],
-                "html_url": repo["html_url"],
-                "description": repo["description"],
-                "language": repo["language"],
-                "updated_at": repo["updated_at"]
-            }
-            for repo in repos
-        ]
+    repos = response.json()
+    
+    # Format for frontend consumption
+    return [
+        {
+            "id": repo["id"],
+            "name": repo["name"],
+            "full_name": repo["full_name"],
+            "private": repo["private"],
+            "html_url": repo["html_url"],
+            "description": repo["description"],
+            "language": repo["language"],
+            "stars": repo.get("stargazers_count", 0),
+            "updated_at": repo["updated_at"]
+        }
+        for repo in repos
+    ]

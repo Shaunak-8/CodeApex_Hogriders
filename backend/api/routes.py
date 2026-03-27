@@ -94,12 +94,12 @@ async def register_user(req: EnsureUserRequest, request: Request):
 async def fetch_github_repos(request: Request):
     try:
         await verify_token(request)
+        logger.info("Token verified, fetching repos...")
         repos = await get_user_repositories()
+        logger.info(f"Successfully fetched {len(repos)} repos from GitHub API")
         return {"repos": repos}
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.exception("Failed to fetch GitHub repos: %s", e)
+        logger.error(f"Failed to fetch GitHub repos in route: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ---------------- PROJECT ENDPOINTS ---------------- #
