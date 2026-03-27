@@ -15,14 +15,15 @@ class RunStatusEnum(str, Enum):
     running = "running"
     completed = "completed"
     failed = "failed"
+    passed = "passed"
 
 class IterationStatusEnum(str, Enum):
     running = "running"
     testing = "testing"
     passed = "passed"
     failed = "failed"
-    pass_ = "passed"  # Alias for compatibility
-    fail = "failed"    # Alias for compatibility
+    pass_ = "passed"
+    fail = "failed"
 
 class FixStatusEnum(str, Enum):
     applied = "applied"

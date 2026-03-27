@@ -248,6 +248,10 @@ class OrchestratorAgent:
         if self.db and state.get("db_iteration_id"):
             it_status = parse_iteration_status(state["status"])
             crud.update_iteration(self.db, iteration_id=state["db_iteration_id"], status=it_status.value, logs=val_res.get("message", "Validation complete"))
+            
+            # Also update overall run status if this was the final pass/fail
+            run_status = "completed" if it_status == IterationStatusEnum.passed else "failed"
+            crud.update_run(self.db, run_id=run_id, status=run_status)
 
         emit(run_id, "ValidatorAgent", state["status"], "VALIDATION_DONE")
         return state

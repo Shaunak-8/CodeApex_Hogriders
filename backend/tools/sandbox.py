@@ -16,8 +16,9 @@ class E2BSandbox:
         """Run a command in E2B if possible, else local fall back."""
         if self.api_key and Sandbox:
             try:
-                # E2B Sandbox for secure execution
-                with Sandbox(api_key=self.api_key) as sb:
+                # E2B SDK v1.0+ uses E2B_API_KEY env var automatically.
+                # Do not pass api_key=... as it causes SandboxBase.__init__ error.
+                with Sandbox() as sb:
                     # Upload CWD to sandbox (Simplified for this turn)
                     # In a real app, you'd sync the whole repo
                     # For now, we fallback to local for complex repo-wide tests

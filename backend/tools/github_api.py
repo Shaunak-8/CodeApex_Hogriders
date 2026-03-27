@@ -8,19 +8,25 @@ async def get_user_repositories():
     token = os.getenv("GITHUB_TOKEN")
     
     if not token:
-        return []
+        raise ValueError("GITHUB_TOKEN is missing in environment variables.")
         
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json"
     }
     
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        # Fetching user's own repos and repos they collaborate on
-        response = await client.get("https://api.github.com/user/repos?per_page=100&sort=updated", headers=headers)
-        
-        if response.status_code != 200:
-            return []
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            # Fetching user's own repos and repos they collaborate on
+            response = await client.get("https://api.github.com/user/repos?per_page=100&sort=updated", headers=headers)
+            
+            if response.status_code != 200:
+                error_msg = f"GitHub API failed with status {response.status_code}: {response.text}"
+                raise RuntimeError(error_msg)
+    except Exception as e:
+        # Re-raise or propagate with context
+        print(f"Error in get_user_repositories: {e}")
+        raise
             
         repos = response.json()
         

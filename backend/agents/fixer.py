@@ -82,13 +82,20 @@ Return ONLY the complete fixed file content. No markdown, no explanations."""
                 fixed_code = response.choices[0].message.content.strip()
 
             
-            # Robust code extraction using regex
-            code_match = re.search(r"```(?:\w+)?\n(.*?)\n```", fixed_code, re.DOTALL)
+            # Robust code extraction
+            # 1. Try flexible regex (handles space before language tag and optional newlines)
+            code_match = re.search(r"```[ \t]*(?:\w+)?[ \t]*\n?(.*?)\s*```", fixed_code, re.DOTALL)
             if code_match:
                 fixed_code = code_match.group(1).strip()
             else:
-                # Fallback: strip any remaining backticks if no full block found
-                fixed_code = fixed_code.replace("```", "").strip()
+                # 2. Fallback: Manual block extraction
+                lines = fixed_code.splitlines()
+                if len(lines) >= 2 and lines[0].startswith("```") and lines[-1].startswith("```"):
+                    # Extract everything between the first and last lines
+                    fixed_code = "\n".join(lines[1:-1]).strip()
+                else:
+                    # 3. Last resort: just strip backticks
+                    fixed_code = fixed_code.replace("```", "").strip()
 
             return {
                 "fixed_code": fixed_code,
