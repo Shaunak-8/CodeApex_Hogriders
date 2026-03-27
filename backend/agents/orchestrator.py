@@ -1,11 +1,19 @@
 from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, List
-import agents.analyzer as analyzer
-import agents.fixer as fixer
-import agents.validator as validator
-import agents.reporter as reporter
 import sys
 import os
+
+try:
+    import agents.analyzer as analyzer
+    import agents.fixer as fixer
+    import agents.validator as validator
+    import agents.reporter as reporter
+except ImportError:
+    pass # Will gracefully fail if agents aren't actually stubbed
+
+from sqlalchemy.orm import Session
+from db import crud
+import tools.git_ops as git_ops
 
 class AgentState(TypedDict):
     failures: List[dict]
@@ -13,22 +21,32 @@ class AgentState(TypedDict):
     fixes_applied: List[dict]
     iteration: int
     run_id: str
+    repo_url: str
+    branch_name: str
+    db_iteration_id: int
 
 class OrchestratorAgent:
-    def __init__(self):
-        self.analyzer = analyzer.AnalyzerAgent()
-        self.router = fixer.FixerRouter()
-        self.validator = validator.ValidatorAgent()
-        self.reporter = reporter.ReporterAgent()
+    def __init__(self, db: Session = None):
+        try:
+            self.analyzer = analyzer.AnalyzerAgent()
+            self.router = fixer.FixerRouter()
+            self.validator = validator.ValidatorAgent()
+            self.reporter = reporter.ReporterAgent()
+        except Exception:
+            self.analyzer = None
+            
+        self.db = db
         
         workflow = StateGraph(AgentState)
         
+        workflow.add_node("clone", self.clone_node)
         workflow.add_node("analyze", self.analyze_node)
         workflow.add_node("fix", self.fix_node)
         workflow.add_node("validate", self.validate_node)
         workflow.add_node("report", self.report_node)
         
-        workflow.add_edge(START, "analyze")
+        workflow.add_edge(START, "clone")
+        workflow.add_edge("clone", "analyze")
         workflow.add_edge("analyze", "fix")
         workflow.add_edge("fix", "validate")
         workflow.add_edge("validate", "report")
@@ -36,87 +54,150 @@ class OrchestratorAgent:
         
         self.app = workflow.compile()
         
+    def clone_node(self, state: AgentState):
+        if self.db:
+            crud.update_run(self.db, run_id=state["run_id"], status="cloning repo")
+            
+        repo_path = os.path.join(os.getcwd(), "workspaces", f"run_{state['run_id']}")
+        try:
+            repo = git_ops.clone_repo(state["repo_url"], repo_path)
+            git_ops.create_branch(repo, state["branch_name"])
+            state["ledger"]["repo_path"] = repo_path
+        except Exception as e:
+            state["ledger"]["clone_error"] = str(e)
+            if self.db:
+                crud.update_run(self.db, run_id=state["run_id"], status="failed", memory={"error": f"Git Pull Failed: {str(e)}"})
+        return state
+
     def analyze_node(self, state: AgentState):
-        state["failures"] = self.analyzer.run("mock_path")
+        state["iteration"] += 1
+        
+        if self.db:
+            iteration = crud.create_iteration(self.db, run_id=state["run_id"], iteration_number=state["iteration"])
+            state["db_iteration_id"] = iteration.id
+            crud.update_iteration(self.db, iteration_id=state["db_iteration_id"], status="analyzing")
+
+        repo_path = state["ledger"].get("repo_path", "mock_path")
+        if self.analyzer:
+            state["failures"] = self.analyzer.run(repo_path)
+        else:
+            state["failures"] = [{"bug_type": "LINTING", "file": "src/main.py", "message": "Mock analysis"}]
         return state
         
     def fix_node(self, state: AgentState):
-        if state["failures"]:
+        if state["failures"] and hasattr(self, "router"):
             f = state["failures"][0]
-            AgentClass = self.router.route(f["bug_type"])
-            agent = AgentClass(None, None, None)
-            fix_res = agent.fix(f, {})
-            state["fixes_applied"].append(fix_res)
+            try:
+                AgentClass = self.router.route(f.get("bug_type", "LINTING"))
+                agent = AgentClass(None, None, None)
+                fix_res = agent.fix(f, {})
+                state["fixes_applied"].append(fix_res)
+                
+                if self.db and state.get("db_iteration_id"):
+                    crud.create_fix(
+                        db=self.db,
+                        run_id=state["run_id"],
+                        iteration_id=state["db_iteration_id"],
+                        file_path=fix_res.get("file", "unknown_file.py"),
+                        bug_type=f.get("bug_type", "UNKNOWN"),
+                        commit_message=fix_res.get("message", "Applied fix"),
+                        status="applied"
+                    )
+            except Exception:
+                pass
         return state
         
     def validate_node(self, state: AgentState):
-        self.validator.validate("mock_path", {}, {})
+        repo_path = state["ledger"].get("repo_path", "mock_path")
+        if hasattr(self, "validator") and self.validator:
+            self.validator.validate(repo_path, {}, {})
+            
+        if self.db and state.get("db_iteration_id"):
+            status_val = "pass" if not state["failures"] else "fail"
+            crud.update_iteration(self.db, iteration_id=state["db_iteration_id"], status=status_val, logs="Validation complete")
         return state
         
     def report_node(self, state: AgentState):
-        self.reporter.build_results({"run_id": state["run_id"], "commits": len(state["fixes_applied"])})
+        if hasattr(self, "reporter") and self.reporter:
+            self.reporter.build_results({"run_id": state["run_id"], "commits": len(state["fixes_applied"])})
+            
+        if self.db:
+            score = 100.0 if not state["failures"] else max(0.0, 100.0 - (len(state["failures"]) * 10))
+            status = "completed" if not state["failures"] else "failed"
+            crud.update_run(
+                self.db, 
+                run_id=state["run_id"], 
+                status=status, 
+                overall_score=score,
+                memory={"fixes_count": len(state["fixes_applied"]), "ledger": state["ledger"]}
+            )
         return state
 
-    def run(self, run_id: str):
+    def run(self, run_id: str, repo_url: str = "mock_repo", branch_name: str = "main"):
         initial_state = {
             "failures": [],
             "ledger": {},
             "fixes_applied": [],
             "iteration": 0,
-            "run_id": run_id
+            "run_id": run_id,
+            "repo_url": repo_url,
+            "branch_name": branch_name,
+            "db_iteration_id": 0
         }
         return self.app.invoke(initial_state)
 
 # --- SIMPLE HACKATHON ORCHESTRATOR implementation below ---
 
-# Add parent directory to path to allow importing from 'agents' and 'core' when run directly
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-from agents.analyzer import parse_failure
-from agents.fixer import generate_fix
-
-from agents.validator import validate_fix
-from agents.reporter import report_result
-from core.context_builder import build_context
-
+try:
+    from agents.analyzer import parse_failure
+    from agents.fixer import generate_fix
+    from agents.validator import validate_fix
+    from agents.reporter import report_result
+    from core.context_builder import build_context
+except ImportError:
+    pass
 
 def run_orchestrator(raw_failure_output: str):
     print("--- Starting Orchestrator ---")
-    
-    failure = parse_failure(raw_failure_output)
-    if not failure:
-        print("Could not parse failure.")
-        return
-        
-    print(f"Parsed Failure: {failure.to_dict()}")
-
-    max_attempts = 3
-    success = False
-    
-    for attempt in range(1, max_attempts + 1):
-        print(f"\n[Attempt {attempt}/{max_attempts}]")
-        
-        context = build_context(failure)
-        
-        fix = generate_fix(context, failure)
-        print(f"Generated Fix:\n{fix}\n")
-        
-        is_valid = validate_fix(fix, failure)
-        
-        report_result(attempt, is_valid, fix)
-        
-        if is_valid:
-            print(f"✅ Fix validated successfully on attempt {attempt}.")
-            success = True
-            break
-        else:
-            print("❌ Validation failed.")
+    try:
+        failure = parse_failure(raw_failure_output)
+        if not failure:
+            print("Could not parse failure.")
+            return
             
-    if not success:
-        print("\nFailed to generate a valid fix after 3 attempts.")
+        print(f"Parsed Failure: {failure.to_dict()}")
+
+        max_attempts = 3
+        success = False
+        
+        for attempt in range(1, max_attempts + 1):
+            print(f"\n[Attempt {attempt}/{max_attempts}]")
+            
+            context = build_context(failure)
+            
+            fix = generate_fix(context, failure)
+            print(f"Generated Fix:\n{fix}\n")
+            
+            is_valid = validate_fix(fix, failure)
+            
+            report_result(attempt, is_valid, fix)
+            
+            if is_valid:
+                print(f"✅ Fix validated successfully on attempt {attempt}.")
+                success = True
+                break
+            else:
+                print("❌ Validation failed.")
+                
+        if not success:
+            print("\nFailed to generate a valid fix after 3 attempts.")
+    except Exception as e:
+        print(f"Error running orchestrator: {e}")
 
 if __name__ == "__main__":
     try:

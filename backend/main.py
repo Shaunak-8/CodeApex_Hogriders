@@ -1,7 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from config import MAX_RETRIES
+try:
+    from config import MAX_RETRIES
+except ImportError:
+    MAX_RETRIES = 3
 
+from db.db import engine
+from db.models import Base
 from api.routes import router as api_router
 
 app = FastAPI(title="Hogriders CI/CD Agent API")
@@ -17,9 +22,18 @@ app.add_middleware(
 
 app.include_router(api_router, prefix="/api")
 
+@app.on_event("startup")
+def startup():
+    print("🔥 Creating tables in Neon...")
+    Base.metadata.create_all(bind=engine)
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "max_retries": MAX_RETRIES}
+
+@app.get("/")
+def root():
+    return {"message": "Backend + DB working 🚀"}
 
 if __name__ == "__main__":
     import uvicorn
