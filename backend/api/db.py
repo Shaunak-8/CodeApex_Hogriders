@@ -33,13 +33,14 @@ def ensure_user(user_id: str, email: str, profile_data: dict = None):
 def create_project(user_id: str, repo_url: str, name: str, tags: list, visibility: str = 'private'):
     conn = get_db_connection()
     try:
+        visibility_val = visibility.value if hasattr(visibility, 'value') else visibility
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
                 INSERT INTO projects (user_id, repo_url, name, tags, visibility) 
                 VALUES (%s, %s, %s, %s::json, %s) RETURNING *
                 """,
-                (user_id, repo_url, name, json.dumps(tags), visibility)
+                (user_id, repo_url, name, json.dumps(tags), visibility_val)
             )
             project = cur.fetchone()
         conn.commit()
@@ -131,13 +132,14 @@ def create_issue(project_id: str, file: str, severity: str, status: str = 'open'
 def create_task(project_id: str, description: str, status: str = 'todo'):
     conn = get_db_connection()
     try:
+        status_val = status.value if hasattr(status, 'value') else status
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
                 INSERT INTO tasks (project_id, description, status) 
                 VALUES (%s, %s, %s) RETURNING *
                 """,
-                (project_id, description, status)
+                (project_id, description, status_val)
             )
             task = cur.fetchone()
         conn.commit()
@@ -157,8 +159,9 @@ def get_tasks(project_id: str):
 def update_task_status(task_id: str, status: str):
     conn = get_db_connection()
     try:
+        status_val = status.value if hasattr(status, 'value') else status
         with conn.cursor() as cur:
-            cur.execute("UPDATE tasks SET status = %s WHERE id = %s", (status, task_id))
+            cur.execute("UPDATE tasks SET status = %s WHERE id = %s", (status_val, task_id))
         conn.commit()
     finally:
         conn.close()

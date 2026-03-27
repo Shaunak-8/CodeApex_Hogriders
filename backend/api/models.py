@@ -1,18 +1,19 @@
 from pydantic import BaseModel
 from typing import List, Optional
+from api.enums import VisibilityEnum, TaskStatusEnum
 
 class ProjectCreate(BaseModel):
     repo_url: str
     name: str
     tags: List[str] = []
-    visibility: str = "private"
+    visibility: VisibilityEnum = VisibilityEnum.PRIVATE
 
 class ProjectResponse(BaseModel):
     id: str
     repo_url: str
     name: str
     tags: List[str]
-    visibility: str
+    visibility: VisibilityEnum
     created_at: str
 
 class EnsureUserRequest(BaseModel):
@@ -21,10 +22,10 @@ class EnsureUserRequest(BaseModel):
 
 class TaskCreate(BaseModel):
     description: str
-    status: str = 'todo'
+    status: TaskStatusEnum = TaskStatusEnum.TODO
 
 class TaskUpdate(BaseModel):
-    status: str
+    status: TaskStatusEnum
 
 class WorkspaceChatRequest(BaseModel):
     project_id: str
