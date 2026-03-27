@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, JSON, func
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, JSON, func, Enum
 from sqlalchemy.orm import relationship
 from db.db import Base
+from api.enums import RunStatusEnum, IterationStatusEnum, FixStatusEnum
 
 
 class Run(Base):
@@ -16,7 +17,7 @@ class Run(Base):
     branch_name = Column(String, nullable=True)
 
     # Status tracking
-    status = Column(String, default="pending")  # pending, running, completed, failed
+    status = Column(Enum(RunStatusEnum), default=RunStatusEnum.PENDING)  # pending, running, completed, failed
 
     # Dashboard + scoring
     overall_score = Column(Float, nullable=True)
@@ -55,7 +56,7 @@ class Iteration(Base):
 
     iteration_number = Column(Integer, nullable=False)
 
-    status = Column(String, default="running")  
+    status = Column(Enum(IterationStatusEnum), default=IterationStatusEnum.RUNNING)  
     # running, testing, pass, fail
 
     logs = Column(Text, nullable=True)
@@ -87,7 +88,7 @@ class Fix(Base):
 
     commit_message = Column(String, nullable=True)
 
-    status = Column(String, default="applied")
+    status = Column(Enum(FixStatusEnum), default=FixStatusEnum.APPLIED)
     # applied, pass, fail, reverted
 
     confidence_score = Column(Float, nullable=True)
