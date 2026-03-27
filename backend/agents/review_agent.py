@@ -1,6 +1,8 @@
 import os
 import instructor
 from groq import Groq
+import google.generativeai as genai
+
 from pydantic import BaseModel
 from typing import List
 
@@ -14,12 +16,20 @@ class ReviewResult(BaseModel):
 
 def analyze_diff(diff_text: str) -> ReviewResult:
     """Analyze a code diff for secrets, bad practices, and bugs."""
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        raise ValueError("GROQ_API_KEY not configured for ReviewAgent")
-        
-    client = Groq(api_key=api_key)
-    instructor_client = instructor.from_groq(client, mode=instructor.Mode.JSON)
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    groq_key = os.getenv("GROQ_API_KEY")
+
+    if gemini_key and gemini_key != "your_gemini_api_key_here":
+        client = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-flash"))
+        instructor_client = instructor.from_gemini(client, mode=instructor.Mode.GEMINI_JSON)
+        model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    elif groq_key:
+        client = Groq(api_key=groq_key)
+        instructor_client = instructor.from_groq(client, mode=instructor.Mode.JSON)
+        model = "llama3-70b-8192"
+    else:
+        raise ValueError("No LLM API keys configured (GEMINI_API_KEY or GROQ_API_KEY)")
+
 
     system_prompt = "You are a ruthlessly efficient Senior Security and QA Engineer. Analyze code diffs and strictly report critical issues like exposed secrets, major logic flaws, or highly insecure practices. If the code looks fine, return an empty list."
     prompt = f"""
@@ -35,8 +45,9 @@ def analyze_diff(diff_text: str) -> ReviewResult:
     """
     
     response = instructor_client.chat.completions.create(
-        model="llama3-70b-8192",
+        model=model,
         response_model=ReviewResult,
+
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}

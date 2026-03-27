@@ -1,5 +1,7 @@
 import os
 from groq import Groq
+import google.generativeai as genai
+
 from agents.schema import FailureRecord
 
 class FixerRouter:
@@ -18,14 +20,17 @@ class FixerRouter:
 class BaseFixerAgent:
     specialty = "software"
 
-    def __init__(self, groq_client: Groq, context_builder):
+    def __init__(self, groq_client: Groq, context_builder, gemini_model=None):
         self.groq_client = groq_client
+        self.gemini_model = gemini_model
         self.context_builder = context_builder
 
+
     def fix(self, failure: dict, repo_path: str, history: list = None) -> dict:
-        if not self.groq_client:
-            # Groq not configured; run without auto-fix capability.
+        if not self.groq_client and not self.gemini_model:
+            # No LLM configured; run without auto-fix capability.
             return {}
+
         # Build context
         file_path = os.path.join(repo_path, failure["file"])
         context = self.context_builder.build(failure["file"], repo_path)
@@ -53,12 +58,27 @@ Test file:
 Return ONLY the complete fixed file content. No markdown, no explanations."""
 
         try:
-            response = self.groq_client.chat.completions.create(
-                model=os.getenv("GROQ_MODEL", "llama3-8b-8192"),
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.0
-            )
-            fixed_code = response.choices[0].message.content.strip()
+            if self.gemini_model:
+                try:
+                    response = self.gemini_model.generate_content(prompt)
+                    fixed_code = response.text.strip()
+                except Exception as ge:
+                    print(f"Gemini API error: {ge}. Falling back to Groq if possible.")
+                    if not self.groq_client: return {}
+                    response = self.groq_client.chat.completions.create(
+                        model=os.getenv("GROQ_MODEL", "llama3-8b-8192"),
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.0
+                    )
+                    fixed_code = response.choices[0].message.content.strip()
+            else:
+                response = self.groq_client.chat.completions.create(
+                    model=os.getenv("GROQ_MODEL", "llama3-8b-8192"),
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0
+                )
+                fixed_code = response.choices[0].message.content.strip()
+
             
             # Strip markdown fences if present
             if fixed_code.startswith("```"):
