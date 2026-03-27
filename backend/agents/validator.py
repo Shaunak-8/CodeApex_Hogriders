@@ -2,6 +2,7 @@ from tools.sandbox import E2BSandbox
 import tempfile
 import subprocess
 import os
+from api.enums import IterationStatusEnum
 
 class ValidatorAgent:
     def __init__(self):
@@ -13,15 +14,15 @@ class ValidatorAgent:
         # Use the sandbox to run validation tests
         res = self.sandbox.validate_tests(repo_path)
         
-        status = "PASS" if res["failed"] == 0 and res["passed"] > 0 else "FAIL"
+        status = IterationStatusEnum.passed if res["failed"] == 0 and res["passed"] > 0 else IterationStatusEnum.failed
         
         # Special case: if no tests ran, check if it's just a linting fix
         if res["passed"] == 0 and res["failed"] == 0:
             # We assume it passed if it compiled (already checked in sandbox.execute_fix)
-            status = "PASS"
+            status = IterationStatusEnum.passed
 
         return {
-            "status": status,
+            "status": status.value,
             "remaining_failures": res["failed"],
             "output": res["output"]
         }

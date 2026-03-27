@@ -7,7 +7,7 @@ import { FolderGit2, Calendar, GitCommit, AlertTriangle, Plus, Loader } from 'lu
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -16,8 +16,15 @@ export default function ProjectsPage() {
   const reset = useAgentStore(s => s.reset);
 
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
     async function fetchProjects() {
-      if (!session?.access_token) return;
+      if (!session?.access_token) {
+        setLoading(false);
+        return;
+      }
       try {
         const data = await getProjects();
         setProjects(data.projects || []);
@@ -28,7 +35,7 @@ export default function ProjectsPage() {
       }
     }
     fetchProjects();
-  }, [session]);
+  }, [session, authLoading]);
 
   const handleOpenProject = (p) => {
     reset();

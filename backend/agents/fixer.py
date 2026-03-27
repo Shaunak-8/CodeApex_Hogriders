@@ -1,6 +1,8 @@
 import os
+import re
 from groq import Groq
 import google.generativeai as genai
+import config
 
 from agents.schema import FailureRecord
 
@@ -66,24 +68,34 @@ Return ONLY the complete fixed file content. No markdown, no explanations."""
                     print(f"Gemini API error: {ge}. Falling back to Groq if possible.")
                     if not self.groq_client: return {}
                     response = self.groq_client.chat.completions.create(
-                        model=os.getenv("GROQ_MODEL", "llama3-8b-8192"),
+                        model=config.GROQ_MODEL,
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.0
                     )
                     fixed_code = response.choices[0].message.content.strip()
             else:
                 response = self.groq_client.chat.completions.create(
-                    model=os.getenv("GROQ_MODEL", "llama3-8b-8192"),
+                    model=config.GROQ_MODEL,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.0
                 )
                 fixed_code = response.choices[0].message.content.strip()
 
             
-            # Strip markdown fences if present
-            if fixed_code.startswith("```"):
-                lines = fixed_code.split("\n")
-                fixed_code = "\n".join(lines[1:-1]) if lines[-1].strip() == "```" else "\n".join(lines[1:])
+            # Robust code extraction
+            # 1. Try flexible regex (handles space before language tag and optional newlines)
+            code_match = re.search(r"```[ \t]*(?:\w+)?[ \t]*\n?(.*?)\s*```", fixed_code, re.DOTALL)
+            if code_match:
+                fixed_code = code_match.group(1).strip()
+            else:
+                # 2. Fallback: Manual block extraction
+                lines = fixed_code.splitlines()
+                if len(lines) >= 2 and lines[0].startswith("```") and lines[-1].startswith("```"):
+                    # Extract everything between the first and last lines
+                    fixed_code = "\n".join(lines[1:-1]).strip()
+                else:
+                    # 3. Last resort: just strip backticks
+                    fixed_code = fixed_code.replace("```", "").strip()
 
             return {
                 "fixed_code": fixed_code,
@@ -134,7 +146,7 @@ Return ONLY the fixed python code snippet. No markdown blocks, no explanations.
     if gemini_key and gemini_key != "your_gemini_api_key_here":
         try:
             genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-flash"))
+            model = genai.GenerativeModel(config.GEMINI_MODEL)
             response = model.generate_content(prompt)
             return response.text.strip()
         except Exception as e:
@@ -147,7 +159,7 @@ Return ONLY the fixed python code snippet. No markdown blocks, no explanations.
     try:
         client = Groq(api_key=groq_key)
         response = client.chat.completions.create(
-            model=os.getenv("GROQ_MODEL", "llama3-8b-8192"),
+            model=config.GROQ_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0
         )

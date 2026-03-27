@@ -2,26 +2,37 @@ import tools.linters as linters
 import re
 from typing import Optional
 from agents.schema import FailureRecord
+from api.sse import emit
 
 class AnalyzerAgent:
     def __init__(self):
         pass
 
-    def run(self, repo_path: str):
+    def run(self, repo_path: str, run_id: str = None):
         """Run all linters and tests, return grouped failures."""
         failures = []
         
+        def _emit(msg, status="ANALYZING"):
+            if run_id:
+                emit(run_id, "AnalyzerAgent", msg, status)
+
         # 1. Syntax & Linting (Fastest)
+        _emit("Running Flake8...")
         failures.extend(self._tag(linters.run_flake8(repo_path), "LINTING"))
         
         # 2. Type Checking
+        _emit("Running Mypy...")
         failures.extend(self._tag(linters.run_mypy(repo_path), "TYPE_ERROR"))
         
         # 3. JS/TS Checks
+        _emit("Running ESLint...")
         failures.extend(self._tag(linters.run_eslint(repo_path), "JS"))
         
         # 4. Logic & Tests (Execution required)
+        _emit("Running Pytest...")
         failures.extend(self._tag(linters.run_pytest(repo_path), "LOGIC"))
+        
+        _emit("Running Jest...")
         failures.extend(self._tag(linters.run_jest(repo_path), "JS"))
         
         # Deduplication and prioritization

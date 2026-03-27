@@ -82,7 +82,7 @@ def run_pytest(path: str) -> list:
 def run_eslint(path: str) -> list:
     if not shutil.which("npx") or not os.path.exists(os.path.join(path, "package.json")):
         return []
-    code, stdout, _ = _run_tool(["npx", "eslint", ".", "--format=compact"], cwd=path)
+    code, stdout, _ = _run_tool(["npx", "--yes", "eslint", ".", "--format=compact"], cwd=path)
     failures = []
     for line in stdout.strip().splitlines():
         # Format: /path/file.js: line col, Error - message (rule)
@@ -105,7 +105,7 @@ def run_eslint(path: str) -> list:
 def run_jest(path: str) -> list:
     if not shutil.which("npx") or not os.path.exists(os.path.join(path, "package.json")):
         return []
-    code, stdout, stderr = _run_tool(["npx", "jest", "--no-coverage", "--json"], cwd=path)
+    code, stdout, stderr = _run_tool(["npx", "--yes", "jest", "--no-coverage", "--json"], cwd=path)
     if code != 0:
         # Try to parse JSON output
         import json

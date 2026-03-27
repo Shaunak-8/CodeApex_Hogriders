@@ -114,7 +114,7 @@ async def create_new_project(req: ProjectCreate, request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Failed to create project: %s", e)
+        logger.error("Project creation failed: %s", str(e), exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/projects")
@@ -172,17 +172,15 @@ async def run_agent(
     # Always pick a run_id first so we can use it consistently for SSE + DB.
     run_id = str(uuid.uuid4())[:8]
 
-    # Create a DB run whenever we have a project_id (even if auth is missing),
-    # otherwise background iteration logging will violate FK constraints.
-    if request_body.project_id:
-        db_create_run(
-            run_id=run_id,
-            project_id=request_body.project_id,
-            repo_url=request_body.repo_url,
-            team_name=request_body.team_name,
-            leader_name=request_body.leader_name,
-            branch_name=request_body.branch_name,
-        )
+    # Create a DB run immediately so background tasks can link iterations/fixes to it.
+    db_create_run(
+        run_id=run_id,
+        project_id=request_body.project_id,
+        repo_url=request_body.repo_url,
+        team_name=request_body.team_name,
+        leader_name=request_body.leader_name,
+        branch_name=request_body.branch_name,
+    )
 
     # Initialize SSE Queue
     get_queue(run_id)

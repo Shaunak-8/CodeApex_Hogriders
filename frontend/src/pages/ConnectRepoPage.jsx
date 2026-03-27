@@ -8,7 +8,7 @@ import { getRepos, createProject, registerUser } from '../lib/api';
 
 export default function ConnectRepoPage() {
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const setRepoUrl = useAgentStore(s => s.setRepoUrl);
   const setProjectId = useAgentStore(s => s.setProjectId);
   
@@ -25,6 +25,7 @@ export default function ConnectRepoPage() {
   useEffect(() => {
     let isMounted = true;
     async function fetchRepos() {
+      if (authLoading) return;
       if (!session?.access_token) {
         if (isMounted) setLoading(false);
         return;
@@ -41,7 +42,7 @@ export default function ConnectRepoPage() {
     }
     fetchRepos();
     return () => { isMounted = false; };
-  }, [session]);
+  }, [session, authLoading]);
 
   const filtered = repos.filter(r => r.name.toLowerCase().includes(search.toLowerCase()));
 

@@ -4,19 +4,23 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # ✅ Safe import (prevents crash if missing)
 try:
-    from config import MAX_RETRIES
+    from config import MAX_RETRIES, PORT
 except ImportError:
     MAX_RETRIES = 3
+    PORT = 8000
 
 # ✅ KEEP THIS (YOUR DB INTEGRATION)
 from db.db import engine
-from db.models import Base
+
 
 from api.routes import router as api_router
 from api.sse import router as sse_router
 
+# Auto-create tables (using Neon)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from db.db import engine, Base
+    from db.models import User, Project, Run, Iteration, Fix, Issue, Task
     print("🔥 Creating tables in Neon...")
     Base.metadata.create_all(bind=engine)
     yield
@@ -53,7 +57,16 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app", 
         host="0.0.0.0", 
-        port=8001, 
-        reload=True,
-        reload_excludes=["workspaces/*", "results/*", "**/__pycache__/*", "*.log"]
+        port=PORT, 
+        reload=False,
+        reload_excludes=[
+            "workspaces", 
+            "workspaces/*", 
+            "results", 
+            "results/*", 
+            "**/__pycache__/*", 
+            "*.log", 
+            ".git", 
+            ".git/*"
+        ]
     )
