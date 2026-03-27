@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Activity, GitMerge, FileWarning, TrendingUp } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { getProjects } from '../lib/api';
+import { getProjects, getHeatmapData } from '../lib/api';
 import CommandCenter from '../components/CommandCenter';
 
 export default function GlobalDashboardPage() {
   const { session } = useAuth();
   const [stats, setStats] = useState({ projects: 0, runs: 0, issues: 0 });
+  const [heatmap, setHeatmap] = useState([]);
+  const [loadingHeatmap, setLoadingHeatmap] = useState(true);
 
   useEffect(() => {
     async function fetchStats() {
@@ -30,7 +32,18 @@ export default function GlobalDashboardPage() {
         console.error(e);
       }
     }
+    async function fetchHeatmap() {
+        try {
+            const data = await getHeatmapData();
+            setHeatmap(data.heatmap || []);
+        } catch (e) {
+            console.error("Failed to fetch heatmap:", e);
+        } finally {
+            setLoadingHeatmap(false);
+        }
+    }
     fetchStats();
+    fetchHeatmap();
   }, [session]);
 
   const cards = [
@@ -63,12 +76,40 @@ export default function GlobalDashboardPage() {
         <div style={styles.heatmapCard}>
           <h3 style={styles.chartTitle}>CONTRIBUTION HEATMAP</h3>
           <div style={styles.heatmapGrid}>
-              {Array.from({ length: 156 }).map((_, i) => (
-                  <div key={i} style={{
-                      width: 12, height: 12, borderRadius: 2,
-                      background: Math.random() > 0.8 ? '#00ff88' : Math.random() > 0.5 ? '#007744' : '#111118'
-                  }}></div>
-              ))}
+              {loadingHeatmap ? (
+                  Array.from({ length: 156 }).map((_, i) => (
+                      <div key={i} style={{ ...styles.heatmapCell, background: '#1a1a24' }}></div>
+                  ))
+              ) : heatmap.length === 0 ? (
+                  <div style={styles.emptyHeatmap}>
+                      <span style={styles.emptyText}>DATA UNAVAILABLE</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {Array.from({ length: 156 }).map((_, i) => (
+                              <div key={i} style={{ ...styles.heatmapCell, background: '#111118' }}></div>
+                          ))}
+                      </div>
+                  </div>
+              ) : (
+                  Array.from({ length: 156 }).map((_, i) => {
+                      // Simple mapping: use the data we have, starting from the end (most recent)
+                      // heatmap returns [ {date, count}, ... ] sorted by date ASC
+                      const dataIndex = heatmap.length - 156 + i;
+                      const dayData = dataIndex >= 0 ? heatmap[dataIndex] : null;
+                      const count = dayData ? dayData.count : 0;
+                      
+                      let color = '#111118';
+                      if (count > 5) color = '#00ff88';
+                      else if (count > 2) color = '#00cc77';
+                      else if (count > 0) color = '#007744';
+                      
+                      return (
+                          <div key={i} title={dayData?.date} style={{
+                              ...styles.heatmapCell,
+                              background: color
+                          }}></div>
+                      );
+                  })
+              )}
           </div>
         </div>
         <CommandCenter />
@@ -92,5 +133,8 @@ const styles = {
   dashboardBody: { display: 'grid', gridTemplateColumns: '1fr 400px', gap: 20 },
   heatmapCard: { background: '#0a0a0f', border: '1px solid #1e1e2e', borderRadius: 12, padding: 24 },
   chartTitle: { fontSize: 11, letterSpacing: 2, color: '#888', marginBottom: 20 },
-  heatmapGrid: { display: 'flex', flexWrap: 'wrap', gap: 4, opacity: 0.8 }
+  heatmapGrid: { display: 'flex', flexWrap: 'wrap', gap: 4, opacity: 0.8, minHeight: 44 },
+  heatmapCell: { width: 12, height: 12, borderRadius: 2 },
+  emptyHeatmap: { position: 'relative', width: '100% '},
+  emptyText: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: 10, fontWeight: 800, color: '#444', letterSpacing: 2, background: 'rgba(10,10,15,0.8)', padding: '4px 8px', borderRadius: 4, zIndex: 1 }
 };

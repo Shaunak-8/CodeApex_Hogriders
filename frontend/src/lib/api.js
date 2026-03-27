@@ -82,4 +82,9 @@ export const generateInfra = async (projectId) => {
     return response.data;
 };
 
+export const getHeatmapData = async () => {
+    const response = await api.get('/stats/heatmap');
+    return response.data;
+};
+
 export default api;
