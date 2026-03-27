@@ -1,12 +1,17 @@
 from fastapi import Request, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import jwt, JWTError
-from config import SUPABASE_JWT_SECRET
+import logging
+from config import SUPABASE_URL, SUPABASE_SERVICE_KEY
+from supabase import create_client, Client
+
+logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
 
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
 async def verify_token(request: Request):
-    """Extract and verify the Supabase JWT from the Authorization header."""
+    """Verify the Supabase JWT using the Supabase client."""
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
@@ -14,16 +19,16 @@ async def verify_token(request: Request):
     token = auth_header.split(" ")[1]
     
     try:
-        payload = jwt.decode(
-            token,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            audience="authenticated",
-        )
-        request.state.user_id = payload.get("sub")
-        request.state.email = payload.get("email", "")
-        return payload
-    except JWTError as e:
+        response = supabase.auth.get_user(token)
+        user = response.user
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+            
+        request.state.user_id = user.id
+        request.state.email = user.email
+        return {"sub": user.id, "email": user.email}
+    except Exception as e:
+        logger.error("JWT Verification failed via Supabase. Error: %s", e)
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
 

@@ -163,4 +163,6 @@ dist-ssr
 
 # Project specific results
 backend/results/
+.env
 backend/workspaces/
+node_modules/

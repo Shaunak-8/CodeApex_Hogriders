@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 export const useAgentStore = create((set) => ({
+  projectId: null,
   repoUrl: "",
   teamName: "",
   leaderName: "",
@@ -19,6 +20,7 @@ export const useAgentStore = create((set) => ({
   branch: "HOGRIDERS_EKLAVYA_PURI_AI_Fix",
   
   // Actions
+  setProjectId: (id) => set({ projectId: id }),
   setRepoUrl: (url) => set({ repoUrl: url }),
   setTeamName: (name) => set({ teamName: name }),
   setLeaderName: (name) => set({ leaderName: name }),
