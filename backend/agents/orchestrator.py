@@ -1,13 +1,11 @@
 from langgraph.graph import StateGraph, START, END
-from typing import TypedDict, List
-import agents.analyzer as analyzer
-import agents.fixer as fixer
-import agents.validator as validator
-import agents.reporter as reporter
-import sys
+from typing import TypedDict, List, Optional
 import os
 import json
 import time
+import logging
+from groq import Groq
+
 from agents.analyzer import AnalyzerAgent
 from agents.fixer import FixerRouter
 from agents.validator import ValidatorAgent
@@ -17,8 +15,16 @@ from core.dependency_graph import DependencyGraph
 from core.failure_ledger import FailureLedger
 from core.confidence import calculate as calc_confidence
 from core.context_builder import ContextBuilder
+
 from api.sse import emit
-from groq import Groq
+from sqlalchemy.orm import Session
+from api.db import crud
+
+import tools.git_ops as git_ops
+
+logger = logging.getLogger(__name__)
+
+# ---------------- STATE ---------------- #
 
 class AgentState(TypedDict):
     run_id: str
@@ -35,43 +41,61 @@ class AgentState(TypedDict):
     causal_graph: Optional[dict]
     health_before: int
     health_after: int
+    db_iteration_id: int
+
+# ---------------- ORCHESTRATOR ---------------- #
 
 class OrchestratorAgent:
-    def __init__(self):
+    def __init__(self, db: Session = None):
+        self.db = db
+        self.groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        
         self.analyzer = AnalyzerAgent()
         self.router = FixerRouter()
         self.validator = ValidatorAgent()
         self.reporter = ReporterAgent()
         self.memory = MemoryAgent()
+        
         self.dep_graph = DependencyGraph()
         self.ledger = FailureLedger()
         self.context_builder = ContextBuilder()
-        
-        self.groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
         
         workflow = StateGraph(AgentState)
         workflow.add_node("analyze", self.analyze_node)
         workflow.add_node("fix", self.fix_node)
         workflow.add_node("validate", self.validate_node)
         workflow.add_node("report", self.report_node)
-        
+
         workflow.add_edge(START, "analyze")
         workflow.add_conditional_edges("analyze", self.should_fix, {"continue": "fix", "end": "report"})
         workflow.add_edge("fix", "validate")
         workflow.add_conditional_edges("validate", self.should_retry, {"retry": "analyze", "end": "report"})
         workflow.add_edge("report", END)
-        
+
         self.app = workflow.compile()
+
+    # ---------------- ANALYZE ---------------- #
 
     def analyze_node(self, state: AgentState):
         run_id = state["run_id"]
-        emit(run_id, "OrchestratorAgent", "Starting analysis phase...", "ANALYSIS_STARTED")
+        state["iteration"] += 1
         
+        emit(run_id, "OrchestratorAgent", f"Starting analysis (Iteration {state['iteration']})...", "ANALYSIS_STARTED")
+
+        if self.db:
+            iteration = crud.create_iteration(
+                self.db,
+                run_id=run_id,
+                iteration_number=state["iteration"]
+            )
+            state["db_iteration_id"] = iteration.id
+
         failures = self.analyzer.run(state["repo_path"])
         state["failures"] = failures
         
         # Health score (before) = 100 - (failures * 5), capped at 0
-        state["health_before"] = max(0, 100 - len(failures) * 5)
+        if state["iteration"] == 1:
+            state["health_before"] = max(0, 100 - len(failures) * 5)
         
         if failures:
             emit(run_id, "AnalyzerAgent", f"Detected {len(failures)} failures.", "FAILURE_DETECTED")
@@ -92,7 +116,9 @@ class OrchestratorAgent:
         return state
 
     def should_fix(self, state: AgentState):
-        return "end" if not state["failures"] else "continue"
+        return "continue" if state["failures"] else "end"
+
+    # ---------------- FIX ---------------- #
 
     def fix_node(self, state: AgentState):
         run_id = state["run_id"]
@@ -100,11 +126,11 @@ class OrchestratorAgent:
         
         # Sort by root cause: fix root nodes first
         root_nodes = set(self.dep_graph.get_root_nodes())
-        sorted_failures = sorted(state["failures"], key=lambda f: 0 if f["file"] in root_nodes else 1)
+        sorted_failures = sorted(state["failures"], key=lambda f: 0 if f.get("file") in root_nodes else 1)
         
         for failure in sorted_failures:
-            file_key = failure["file"]
-            bug_type = failure["bug_type"]
+            file_key = failure.get("file")
+            bug_type = failure.get("bug_type", "UNKNOWN")
             strategy = f"{bug_type}:{failure.get('error_message', '')[:50]}"
             
             # Check ledger — skip if already tried
@@ -112,7 +138,7 @@ class OrchestratorAgent:
                 emit(run_id, "MemoryAgent", f"Skipping {file_key} — strategy already tried.", "FIX_ROUTED")
                 continue
             
-            emit(run_id, "OrchestratorAgent", f"Routing {bug_type} in {file_key}...", "FIX_ROUTED")
+            emit(run_id, "OrchestratorAgent", f"Routing {bug_type} fix for {file_key}...", "FIX_ROUTED")
             
             AgentClass = self.router.route(bug_type)
             agent = AgentClass(self.groq_client, self.context_builder)
@@ -123,11 +149,11 @@ class OrchestratorAgent:
             # Blast radius
             try:
                 blast = self.dep_graph.get_blast_radius(file_key)
-            except ValueError:
+            except Exception:
                 blast = 1
             
             fix_res = agent.fix(failure, repo_path, history)
-            
+
             if fix_res and fix_res.get("fixed_code"):
                 # Apply fix
                 full_path = os.path.join(repo_path, file_key)
@@ -165,37 +191,53 @@ class OrchestratorAgent:
                 self.ledger.add_attempt(file_key, strategy, "applied")
                 self.memory.record(file_key, failure.get("line", 0), strategy, "applied")
                 
-                emit(run_id, agent.specialty + "Agent", 
-                     json.dumps(fix_entry),
-                     "FIX_APPLIED")
+                emit(run_id, agent.specialty + "Agent", json.dumps(fix_entry), "FIX_APPLIED")
+
+                # DB LOGGING
+                if self.db:
+                    crud.create_fix(
+                        db=self.db,
+                        run_id=run_id,
+                        iteration_id=state.get("db_iteration_id"),
+                        file_path=file_key,
+                        bug_type=bug_type,
+                        commit_message=fix_res.get("explanation", "Auto fix"),
+                        status="applied"
+                    )
             else:
                 self.ledger.add_attempt(file_key, strategy, "failed")
                 emit(run_id, "OrchestratorAgent", f"Failed to generate fix for {file_key}", "FIX_FAILED")
                 
         return state
 
+    # ---------------- VALIDATE ---------------- #
+
     def validate_node(self, state: AgentState):
         run_id = state["run_id"]
         emit(run_id, "ValidatorAgent", "Validating fixes...", "VALIDATION_STARTED")
         
         val_res = self.validator.validate(state["repo_path"])
-        
+
         if val_res["status"] == "PASS":
             state["status"] = "PASSED"
-            emit(run_id, "ValidatorAgent", "All tests passed!", "VALIDATION_RESULT")
         else:
             state["status"] = "FAILED"
-            emit(run_id, "ValidatorAgent", f"Validation failed. {val_res['remaining_failures']} remaining.", "VALIDATION_RESULT")
-            
+
+        if self.db and state.get("db_iteration_id"):
+            crud.update_iteration(self.db, iteration_id=state["db_iteration_id"], status=state["status"].lower(), logs=val_res.get("message", "Validation complete"))
+
+        emit(run_id, "ValidatorAgent", state["status"], "VALIDATION_DONE")
         return state
 
     def should_retry(self, state: AgentState):
         if state["status"] == "PASSED":
             return "end"
-        state["iteration"] += 1
+        
         if state["iteration"] < state["max_retries"]:
             return "retry"
         return "end"
+
+    # ---------------- REPORT ---------------- #
 
     def report_node(self, state: AgentState):
         run_id = state["run_id"]
@@ -203,15 +245,15 @@ class OrchestratorAgent:
         
         # Git commit and push
         try:
-            from tools.git_ops import commit_and_push_all
             branch_name = f"{state['team_name']}_{state['leader_name']}_AI_Fix"
-            commit_and_push_all(state["repo_path"], "[AI-AGENT] Applied autonomous fixes", branch_name)
+            git_ops.commit_and_push_all(state["repo_path"], "[AI-AGENT] Applied autonomous fixes", branch_name)
             emit(run_id, "GitAgent", f"Pushed fixes to branch {branch_name}", "COMMIT_DONE")
         except Exception as e:
             emit(run_id, "GitAgent", f"Git push failed: {str(e)}", "COMMIT_FAILED")
 
         # Health after
-        state["health_after"] = max(0, 100 - (len(state["failures"]) - len(state["fixes_applied"])) * 5)
+        remaining_failures = len(state["failures"])
+        state["health_after"] = max(0, 100 - (remaining_failures * 5))
         
         # Update causal graph status
         fixed_files = {f["file"] for f in state["fixes_applied"]}
@@ -224,22 +266,38 @@ class OrchestratorAgent:
             run_id=run_id,
             repo_url=state["repo_url"],
             final_status=state["status"],
-            iterations=state["iteration"] + 1,
+            iterations=state["iteration"],
             failures_log=state["failures"],
             fixes=state["fixes_applied"],
             health_score={"before": state.get("health_before", 0), "after": state.get("health_after", 0)},
             causal_graph=state.get("causal_graph", {"nodes": [], "edges": []}),
         )
+
         state["results"] = results
         
-        # Emit final result as JSON for frontend to parse
+        # Emit final result
         emit(run_id, "OrchestratorAgent", json.dumps(results), "RUN_COMPLETED")
+
+        # FINAL DB UPDATE
+        if self.db:
+            score = 100 if state["status"] == "PASSED" else 50
+            crud.update_run(
+                self.db,
+                run_id=run_id,
+                status=state["status"].lower(),
+                overall_score=score,
+                total_fixes=len(state["fixes_applied"]),
+                total_failures=len(state["failures"])
+            )
+
         return state
+
+    # ---------------- RUN ---------------- #
 
     def run(self, run_id: str, repo_url: str, repo_path: str, team_name: str = "", leader_name: str = ""):
         max_retries = int(os.getenv("MAX_RETRIES", 5))
-        emit(run_id, "OrchestratorAgent", f"Run started for {repo_url}", "RUN_STARTED")
-        
+        emit(run_id, "OrchestratorAgent", "Run started", "START")
+
         initial_state = {
             "run_id": run_id,
             "repo_url": repo_url,
@@ -255,70 +313,7 @@ class OrchestratorAgent:
             "causal_graph": None,
             "health_before": 0,
             "health_after": 0,
+            "db_iteration_id": 0
         }
-        
+
         return self.app.invoke(initial_state)
-
-# --- SIMPLE HACKATHON ORCHESTRATOR implementation below ---
-
-# Add parent directory to path to allow importing from 'agents' and 'core' when run directly
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-
-from agents.analyzer import parse_failure
-from agents.fixer import generate_fix
-
-from agents.validator import validate_fix
-from agents.reporter import report_result
-from core.context_builder import build_context
-
-
-def run_orchestrator(raw_failure_output: str):
-    print("--- Starting Orchestrator ---")
-    
-    failure = parse_failure(raw_failure_output)
-    if not failure:
-        print("Could not parse failure.")
-        return
-        
-    print(f"Parsed Failure: {failure.to_dict()}")
-
-    max_attempts = 3
-    success = False
-    
-    for attempt in range(1, max_attempts + 1):
-        print(f"\n[Attempt {attempt}/{max_attempts}]")
-        
-        context = build_context(failure)
-        
-        fix = generate_fix(context, failure)
-        print(f"Generated Fix:\n{fix}\n")
-        
-        is_valid = validate_fix(fix, failure)
-        
-        report_result(attempt, is_valid, fix)
-        
-        if is_valid:
-            print(f"✅ Fix validated successfully on attempt {attempt}.")
-            success = True
-            break
-        else:
-            print("❌ Validation failed.")
-            
-    if not success:
-        print("\nFailed to generate a valid fix after 3 attempts.")
-
-if __name__ == "__main__":
-    try:
-        from fixtures import get_fixtures
-        fixtures = get_fixtures()
-        
-        print(f"Running orchestrator against {len(fixtures)} fixtures...\n")
-        for i, raw_fail in enumerate(fixtures, 1):
-            print(f"=== Fixture {i} ===")
-            run_orchestrator(raw_fail)
-            print("="*40 + "\n")
-    except ImportError:
-        print("fixtures.py not found. Provide input manually or create backend/fixtures.py.")
