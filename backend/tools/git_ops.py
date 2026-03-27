@@ -63,3 +63,28 @@ def commit_and_push(repo: git.Repo, message: str, files: list) -> dict:
         raise RuntimeError(f"Push failed for branch '{branch_name}': {e}") from e
 
     return {"status": "success", "commit": str(commit), "branch": branch_name}
+
+def commit_and_push_all(repo_path: str, message: str, branch_name: str) -> dict:
+    """Stage all changes, create/checkout branch, commit, and push."""
+    repo = git.Repo(repo_path)
+    
+    # Create or checkout the branch
+    create_branch(repo, branch_name)
+    
+    # Stage all changes
+    repo.git.add(A=True)
+    
+    # Check if there's anything to commit
+    if not repo.is_dirty(untracked_files=True):
+        return {"status": "nothing_to_commit", "branch": branch_name}
+    
+    full_message = f"[AI-AGENT] {message}"
+    commit = repo.index.commit(full_message)
+    
+    try:
+        origin = repo.remote(name="origin")
+        origin.push(branch_name)
+    except Exception as e:
+        return {"status": "committed_push_failed", "commit": str(commit), "branch": branch_name, "error": str(e)}
+    
+    return {"status": "success", "commit": str(commit), "branch": branch_name}

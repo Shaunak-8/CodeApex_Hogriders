@@ -36,16 +36,8 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api")
 app.include_router(sse_router)
 
-<<<<<<< HEAD
-=======
-# ✅ DB TABLE CREATION (CRITICAL)
-@app.on_event("startup")
-def startup():
-    print("🔥 Creating tables in Neon...")
-    Base.metadata.create_all(bind=engine)
 
 # Health check
->>>>>>> c50198c6af1b48dfcfbbdad9edfd4f5b1265b7fc
 @app.get("/health")
 def health_check():
     return {"status": "ok", "max_retries": MAX_RETRIES}
@@ -58,4 +50,10 @@ def root():
 # Run locally
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "main:app", 
+        host="0.0.0.0", 
+        port=8001, 
+        reload=True,
+        reload_excludes=["workspaces/*", "results/*", "**/__pycache__/*", "*.log"]
+    )

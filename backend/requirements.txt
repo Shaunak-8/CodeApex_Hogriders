@@ -1,5 +1,6 @@
 fastapi
 uvicorn
+sqlalchemy
 pydantic
 pydantic-settings
 python-dotenv
@@ -14,3 +15,7 @@ gitpython
 supabase
 python-jose[cryptography]
 psycopg2-binary
+google-generativeai
+watchfiles
+
+
