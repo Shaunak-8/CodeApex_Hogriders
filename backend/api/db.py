@@ -165,3 +165,22 @@ def update_task_status(task_id: str, status: str):
         conn.commit()
     finally:
         conn.close()
+
+def get_heatmap_stats():
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT 
+                    DATE(created_at) as date, 
+                    COUNT(*) as count 
+                FROM runs 
+                WHERE created_at >= CURRENT_DATE - INTERVAL '156 days'
+                GROUP BY DATE(created_at)
+                ORDER BY DATE(created_at) ASC;
+                """
+            )
+            return cur.fetchall()
+    finally:
+        conn.close()

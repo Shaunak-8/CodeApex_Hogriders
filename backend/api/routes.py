@@ -13,7 +13,7 @@ from api.db import (
     ensure_user, create_project, get_projects, 
     get_project_stats, create_run as db_create_run, update_run_result,
     get_project, create_task, get_tasks, update_task_status,
-    create_issue, get_db_connection
+    create_issue, get_db_connection, get_heatmap_stats
 )
 from db import crud
 from api.auth import verify_token, get_user_id
@@ -363,3 +363,12 @@ async def get_history(request: Request, db: Session = Depends(get_db)):
         return {"runs": runs}
     except Exception as e:
         return {"error": str(e)}
+
+@router.get("/stats/heatmap")
+async def get_heatmap(request: Request):
+    try:
+        await verify_token(request)
+        data = get_heatmap_stats()
+        return {"heatmap": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
