@@ -23,17 +23,22 @@ def _resolve_enum_label(db: Session, enum_type_name: str, desired_value: str, fa
         return fallback_value or desired_value
 
     desired_lower = desired_value.lower()
+    
+    # Explicit mapping for pass/fail variations to handle "fail" vs "failed" vs "FAIL"
+    if desired_lower in ["fail", "failed", "failure"]:
+        for label in labels:
+            if label.lower() in ["fail", "failed", "failure"]:
+                return label
+    if desired_lower in ["pass", "passed", "success"]:
+        for label in labels:
+            if label.lower() in ["pass", "passed", "success"]:
+                return label
+
     for label in labels:
         if label.lower() == desired_lower:
             return label
 
-    if fallback_value:
-        fallback_lower = fallback_value.lower()
-        for label in labels:
-            if label.lower() == fallback_lower:
-                return label
-
-    return labels[0]
+    return labels[0] if labels else (fallback_value or desired_lower)
 
 # ============
 # RUN CRUD

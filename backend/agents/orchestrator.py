@@ -19,6 +19,7 @@ from core.failure_ledger import FailureLedger
 from core.confidence import calculate as calc_confidence
 from core.context_builder import ContextBuilder
 
+from api.enums import parse_iteration_status, IterationStatusEnum, sanitize_result, normalize_status
 from api.sse import emit
 from sqlalchemy.orm import Session
 from db import crud
@@ -123,6 +124,9 @@ class OrchestratorAgent:
             graph_data["nodes"] = [{"id": n, "status": "failing"} for n in graph_data["nodes"]]
             state["causal_graph"] = graph_data
             
+            # Root nodes
+            state["status"] = "running"
+            
             root_nodes = self.dep_graph.get_root_nodes()
             emit(run_id, "OrchestratorAgent", f"Built dependency graph. Root cause nodes: {root_nodes}", "GRAPH_BUILT")
         else:
@@ -201,11 +205,13 @@ class OrchestratorAgent:
                     "before_code": before_code[:500],
                     "fixed_code": fix_res["fixed_code"][:500],
                 }
+                # Sanitize fix entry before recording
+                fix_entry = sanitize_result(fix_entry)
                 state["fixes_applied"].append(fix_entry)
                 
                 # Record in ledger and memory
-                self.ledger.add_attempt(file_key, strategy, "applied")
-                self.memory.record(file_key, failure.get("line", 0), strategy, "applied")
+                self.ledger.add_attempt(file_key, strategy, fix_entry["status"])
+                self.memory.record(file_key, failure.get("line", 0), strategy, fix_entry["status"])
                 
                 emit(run_id, agent.specialty + "Agent", json.dumps(fix_entry), "FIX_APPLIED")
 
@@ -235,19 +241,19 @@ class OrchestratorAgent:
         
         val_res = self.validator.validate(state["repo_path"])
 
-        if val_res["status"] == "PASS":
-            state["status"] = "PASSED"
-        else:
-            state["status"] = "FAILED"
+        # Determine if we passed or failed using robust helper
+        it_status = parse_iteration_status(val_res["status"])
+        state["status"] = it_status.value
 
         if self.db and state.get("db_iteration_id"):
-            crud.update_iteration(self.db, iteration_id=state["db_iteration_id"], status=state["status"].lower(), logs=val_res.get("message", "Validation complete"))
+            it_status = parse_iteration_status(state["status"])
+            crud.update_iteration(self.db, iteration_id=state["db_iteration_id"], status=it_status.value, logs=val_res.get("message", "Validation complete"))
 
         emit(run_id, "ValidatorAgent", state["status"], "VALIDATION_DONE")
         return state
 
     def should_retry(self, state: AgentState):
-        if state["status"] == "PASSED":
+        if state["status"] == "passed":
             return "end"
         
         if state["iteration"] < state["max_retries"]:
@@ -268,8 +274,9 @@ class OrchestratorAgent:
         except Exception as e:
             emit(run_id, "GitAgent", f"Git push failed: {str(e)}", "COMMIT_FAILED")
 
+        it_status = parse_iteration_status(state["status"])
         # Health after
-        if state["status"] == "PASSED":
+        if it_status == IterationStatusEnum.passed:
             remaining_failures = 0
             state["failures"] = [] # Clear failures list on success
         else:
@@ -305,11 +312,12 @@ class OrchestratorAgent:
 
         # FINAL DB UPDATE
         if self.db:
-            score = 100 if state["status"] == "PASSED" else 50
+            it_status = parse_iteration_status(state["status"])
+            score = 100 if it_status == IterationStatusEnum.passed else 50
             crud.update_run(
                 self.db,
                 run_id=run_id,
-                status=state["status"].lower(),
+                status=it_status.value,
                 overall_score=score,
                 total_fixes=len(state["fixes_applied"]),
                 total_failures=len(state["failures"])
@@ -333,7 +341,7 @@ class OrchestratorAgent:
             "fixes_applied": [],
             "iteration": 0,
             "max_retries": max_retries,
-            "status": "RUNNING",
+            "status": "running",
             "results": None,
             "causal_graph": None,
             "health_before": 0,
