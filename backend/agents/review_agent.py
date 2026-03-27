@@ -1,7 +1,12 @@
 import os
+import logging
+
 import instructor
 from groq import Groq
 import google.generativeai as genai
+
+logger = logging.getLogger(__name__)
+
 
 from pydantic import BaseModel
 from typing import List
@@ -45,15 +50,17 @@ def analyze_diff(diff_text: str) -> ReviewResult:
     </diff>
     """
     
-    response = instructor_client.chat.completions.create(
-        model=model,
-        response_model=ReviewResult,
-
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.1
-    )
-    
-    return response
+    try:
+        response = instructor_client.chat.completions.create(
+            model=model,
+            response_model=ReviewResult,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1
+        )
+        return response
+    except Exception as e:
+        logger.error(f"Error in analyze_diff (model: {model}): {str(e)}", exc_info=True)
+        return ReviewResult(issues=[])

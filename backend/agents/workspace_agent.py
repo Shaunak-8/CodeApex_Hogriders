@@ -4,6 +4,10 @@ import instructor
 from groq import Groq
 import google.generativeai as genai
 import os
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 
 class TaskItem(BaseModel):
@@ -50,37 +54,57 @@ def analyze_workspace(repo_url: str, user_prompt: str) -> WorkspaceRoadmap:
     Keep task descriptions actionable and developer-ready (e.g. "Implement GET /api/users endpoint").
     """
     
-    return instructor_client.chat.completions.create(
-        model=model,
-        response_model=WorkspaceRoadmap,
-
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.3
-    )
+    try:
+        return instructor_client.chat.completions.create(
+            model=model,
+            response_model=WorkspaceRoadmap,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3
+        )
+    except Exception as e:
+        logger.error(f"Error in analyze_workspace (model: {model}): {str(e)}", exc_info=True)
+        return WorkspaceRoadmap(
+            summary=f"Failed to generate roadmap due to provider error: {str(e)}",
+            tasks=[]
+        )
 
 def generate_rca(error_log: str) -> RCAAnalysis:
     instructor_client, model = get_instructor_client()
     prompt = f"Analyze the following error log and provide a detailed Root Cause Analysis:\n\n{error_log}"
     
-    return instructor_client.chat.completions.create(
-        model=model,
-        response_model=RCAAnalysis,
-
-        messages=[{"role": "system", "content": "You are a Senior SRE."}, {"role": "user", "content": prompt}],
-        temperature=0.1
-    )
+    try:
+        return instructor_client.chat.completions.create(
+            model=model,
+            response_model=RCAAnalysis,
+            messages=[{"role": "system", "content": "You are a Senior SRE."}, {"role": "user", "content": prompt}],
+            temperature=0.1
+        )
+    except Exception as e:
+        logger.error(f"Error in generate_rca (model: {model}): {str(e)}", exc_info=True)
+        return RCAAnalysis(
+            root_cause="Error generating RCA",
+            impact="Unknown",
+            long_term_fix="Please check backend logs."
+        )
 
 def generate_infra(repo_context: str) -> InfraConfig:
     instructor_client, model = get_instructor_client()
     prompt = f"Based on this repository info, generate a Dockerfile and GitHub Actions workflow and specify the primary language:\n\n{repo_context}"
     
-    return instructor_client.chat.completions.create(
-        model=model,
-        response_model=InfraConfig,
-
-        messages=[{"role": "system", "content": "You are a DevOps Engineer."}, {"role": "user", "content": prompt}],
-        temperature=0.2
-    )
+    try:
+        return instructor_client.chat.completions.create(
+            model=model,
+            response_model=InfraConfig,
+            messages=[{"role": "system", "content": "You are a DevOps Engineer."}, {"role": "user", "content": prompt}],
+            temperature=0.2
+        )
+    except Exception as e:
+        logger.error(f"Error in generate_infra (model: {model}): {str(e)}", exc_info=True)
+        return InfraConfig(
+            language="Unknown",
+            dockerfile="# Error generating Dockerfile",
+            github_actions="# Error generating GitHub Actions"
+        )
