@@ -1,0 +1,22 @@
+:root {
+  --bg: #0a0a0f;
+  --surface: #111118;
+  --border: #1e1e2e;
+  --green: #00ff88;
+  --red: #ff3b3b;
+  --yellow: #ffaa00;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-heading: 'Syne', sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg);
+  color: #fff;
+  font-family: var(--font-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
