@@ -91,9 +91,16 @@ export default function WorkspacePage() {
             <h3 style={styles.colTitle}><Circle size={14} color="#00ccff" /> TO DO ({todos.length})</h3>
             <div style={styles.taskContainer}>
                 {todos.map(t => (
-                    <div key={t.id} style={styles.taskCard} onClick={() => updateTaskStatus(t.id, 'done')}>
+                    <button 
+                      key={t.id} 
+                      type="button"
+                      style={styles.taskCard} 
+                      className="task-card"
+                      onClick={() => updateTaskStatus(t.id, 'done')}
+                      aria-label={`Mark task as done: ${t.description}`}
+                    >
                         <span style={styles.taskText}>{t.description}</span>
-                    </div>
+                    </button>
                 ))}
             </div>
           </div>
@@ -101,9 +108,16 @@ export default function WorkspacePage() {
             <h3 style={styles.colTitle}><CheckCircle2 size={14} color="#00ff88" /> DONE ({done.length})</h3>
             <div style={styles.taskContainer}>
                 {done.map(t => (
-                    <div key={t.id} style={{...styles.taskCard, opacity: 0.6}} onClick={() => updateTaskStatus(t.id, 'todo')}>
+                    <button 
+                      key={t.id} 
+                      type="button"
+                      style={{...styles.taskCard, opacity: 0.6}} 
+                      className="task-card"
+                      onClick={() => updateTaskStatus(t.id, 'todo')}
+                      aria-label={`Mark task as to-do: ${t.description}`}
+                    >
                         <span style={{...styles.taskText, textDecoration: 'line-through'}}>{t.description}</span>
-                    </div>
+                    </button>
                 ))}
             </div>
           </div>
@@ -152,6 +166,8 @@ export default function WorkspacePage() {
       <style>{`
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
+        .task-card { text-align: left; display: block; width: 100%; transition: 0.2s; }
+        .task-card:hover { border-color: #00ff88 !important; }
       `}</style>
     </div>
   );
@@ -170,7 +186,7 @@ const styles = {
   column: { flex: 1, minWidth: 300, background: '#0a0a0f', border: '1px solid #1e1e2e', borderRadius: 12, display: 'flex', flexDirection: 'column' },
   colTitle: { padding: 16, borderBottom: '1px solid #1e1e2e', fontSize: 11, letterSpacing: 1, color: '#aaa', display: 'flex', alignItems: 'center', gap: 8, background: '#111118', borderRadius: '12px 12px 0 0' },
   taskContainer: { padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' },
-  taskCard: { background: '#111118', border: '1px solid #1e1e2e', padding: 14, borderRadius: 8, cursor: 'pointer', transition: '0.2s', ':hover': { borderColor: '#00ff88' } },
+  taskCard: { background: '#111118', border: '1px solid #1e1e2e', padding: 14, borderRadius: 8, cursor: 'pointer' },
   taskText: { fontSize: 13, color: '#fff', lineHeight: 1.5, fontFamily: "'JetBrains Mono', monospace" },
 
   aiPanel: { width: 400, background: '#111118', border: '1px solid #1e1e2e', borderRadius: 12, display: 'flex', flexDirection: 'column' },
