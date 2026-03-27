@@ -117,12 +117,8 @@ class JSFixerAgent(BaseFixerAgent):
 # --- Standalone generate_fix for CLI orchestrator ---
 
 def generate_fix(context: str, failure: FailureRecord) -> str:
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        print("WARNING: GROQ_API_KEY not set. Returning dummy fix.")
-        return "# Dummy fix generated\npass"
-
-    client = Groq(api_key=api_key)
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    groq_key = os.getenv("GROQ_API_KEY")
 
     prompt = f"""
 Fix the following python code failure.
@@ -134,7 +130,22 @@ Context:
 
 Return ONLY the fixed python code snippet. No markdown blocks, no explanations.
 """
+
+    if gemini_key and gemini_key != "your_gemini_api_key_here":
+        try:
+            genai.configure(api_key=gemini_key)
+            model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-flash"))
+            response = model.generate_content(prompt)
+            return response.text.strip()
+        except Exception as e:
+            print(f"Gemini error in generate_fix: {e}. Falling back to Groq.")
+
+    if not groq_key:
+        print("WARNING: No LLM API keys configured. Returning dummy fix.")
+        return "# Dummy fix generated\npass"
+
     try:
+        client = Groq(api_key=groq_key)
         response = client.chat.completions.create(
             model=os.getenv("GROQ_MODEL", "llama3-8b-8192"),
             messages=[{"role": "user", "content": prompt}],

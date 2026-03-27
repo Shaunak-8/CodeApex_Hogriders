@@ -20,9 +20,10 @@ def analyze_diff(diff_text: str) -> ReviewResult:
     groq_key = os.getenv("GROQ_API_KEY")
 
     if gemini_key and gemini_key != "your_gemini_api_key_here":
-        client = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-flash"))
-        instructor_client = instructor.from_gemini(client, mode=instructor.Mode.GEMINI_JSON)
+        genai.configure(api_key=gemini_key)
         model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        client = genai.GenerativeModel(model)
+        instructor_client = instructor.from_gemini(client, mode=instructor.Mode.GEMINI_JSON)
     elif groq_key:
         client = Groq(api_key=groq_key)
         instructor_client = instructor.from_groq(client, mode=instructor.Mode.JSON)
