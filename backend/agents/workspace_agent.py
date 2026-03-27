@@ -27,8 +27,10 @@ class InfraConfig(BaseModel):
 def get_instructor_client():
     gemini_key = os.getenv("GEMINI_API_KEY")
     if gemini_key and gemini_key != "your_gemini_api_key_here":
-        client = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-flash"))
-        return instructor.from_gemini(client, mode=instructor.Mode.GEMINI_JSON), os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        genai.configure(api_key=gemini_key)
+        model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        client = genai.GenerativeModel(model_name)
+        return instructor.from_gemini(client, mode=instructor.Mode.GEMINI_JSON), model_name
     
     groq_key = os.getenv("GROQ_API_KEY")
     if not groq_key:
