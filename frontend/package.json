@@ -10,14 +10,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.100.1",
     "axios": "^1.6.8",
+    "highlight.js": "^11.9.0",
     "lucide-react": "^0.364.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "reactflow": "^11.10.4",
     "recharts": "^2.12.3",
-    "zustand": "^4.5.2",
-    "highlight.js": "^11.9.0"
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.66",

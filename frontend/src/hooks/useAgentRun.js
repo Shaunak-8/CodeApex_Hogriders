@@ -1,28 +1,35 @@
 import { useAgentStore } from '../store/agentStore';
 import { runAgent } from '../lib/api';
+import { useCallback } from 'react';
 
 export const useAgentRun = () => {
-    const store = useAgentStore();
+    const repoUrl = useAgentStore((s) => s.repoUrl);
+    const teamName = useAgentStore((s) => s.teamName);
+    const leaderName = useAgentStore((s) => s.leaderName);
+    const reset = useAgentStore((s) => s.reset);
+    const setStatus = useAgentStore((s) => s.setStatus);
+    const setStartTime = useAgentStore((s) => s.setStartTime);
+    const setRunId = useAgentStore((s) => s.setRunId);
 
-    const startRun = async () => {
-        if (!store.repoUrl) return;
+    const startRun = useCallback(async () => {
+        if (!repoUrl) return;
 
-        store.reset();
-        store.setStatus('running');
-        store.setStartTime(new Date().toISOString());
+        reset();
+        setStatus('running');
+        setStartTime(new Date().toISOString());
 
         try {
             const result = await runAgent({ 
-                repo_url: store.repoUrl, 
-                team_name: store.teamName, 
-                leader_name: store.leaderName 
+                repo_url: repoUrl, 
+                team_name: teamName, 
+                leader_name: leaderName 
             });
-            store.setRunId(result.run_id);
+            setRunId(result.run_id);
         } catch (error) {
             console.error('Failed to start run', error);
-            store.setStatus('failed');
+            setStatus('failed');
         }
-    };
+    }, [repoUrl, teamName, leaderName, reset, setStatus, setStartTime, setRunId]);
 
     return { startRun };
 };

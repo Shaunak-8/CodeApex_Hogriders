@@ -1,4 +1,5 @@
 import json
+import copy
 
 class FailureLedger:
     def __init__(self):
@@ -24,4 +25,4 @@ class FailureLedger:
         return json.dumps(self._ledger, indent=2)
 
     def to_dict(self) -> dict:
-        return self._ledger
+        return copy.deepcopy(self._ledger)

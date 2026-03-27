@@ -20,6 +20,8 @@ export const useAgentStore = create((set) => ({
   
   // Actions
   setRepoUrl: (url) => set({ repoUrl: url }),
+  setTeamName: (name) => set({ teamName: name }),
+  setLeaderName: (name) => set({ leaderName: name }),
   setStatus: (status) => set({ status }),
   appendThought: (thought) => set((state) => ({ thoughts: [...state.thoughts, thought] })),
   appendFix: (fix) => set((state) => ({ fixes: [...state.fixes, fix] })),
