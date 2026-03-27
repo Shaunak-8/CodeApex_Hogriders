@@ -6,7 +6,7 @@ class ProjectCreate(BaseModel):
     repo_url: str
     name: str
     tags: List[str] = []
-    visibility: VisibilityEnum = VisibilityEnum.PRIVATE
+    visibility: VisibilityEnum = VisibilityEnum.private
 
 class ProjectResponse(BaseModel):
     id: str
@@ -22,7 +22,7 @@ class EnsureUserRequest(BaseModel):
 
 class TaskCreate(BaseModel):
     description: str
-    status: TaskStatusEnum = TaskStatusEnum.TODO
+    status: TaskStatusEnum = TaskStatusEnum.todo
 
 class TaskUpdate(BaseModel):
     status: TaskStatusEnum

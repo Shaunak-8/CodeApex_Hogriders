@@ -5,6 +5,7 @@ from groq import Groq
 import google.generativeai as genai
 import os
 import logging
+import config
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ def get_instructor_client():
     gemini_key = os.getenv("GEMINI_API_KEY")
     if gemini_key and gemini_key != "your_gemini_api_key_here":
         genai.configure(api_key=gemini_key)
-        model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        model_name = config.GEMINI_MODEL
         client = genai.GenerativeModel(model_name)
         return instructor.from_gemini(client, mode=instructor.Mode.GEMINI_JSON), model_name
     
@@ -40,7 +41,7 @@ def get_instructor_client():
     if not groq_key:
         raise ValueError("No LLM API keys configured (GEMINI_API_KEY or GROQ_API_KEY)")
     client = Groq(api_key=groq_key)
-    return instructor.from_groq(client, mode=instructor.Mode.JSON), "llama3-70b-8192"
+    return instructor.from_groq(client, mode=instructor.Mode.JSON), config.GROQ_MODEL
 
 
 def analyze_workspace(repo_url: str, user_prompt: str) -> WorkspaceRoadmap:

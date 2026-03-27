@@ -1,5 +1,6 @@
 import os
 import logging
+import config
 
 import instructor
 from groq import Groq
@@ -26,13 +27,13 @@ def analyze_diff(diff_text: str) -> ReviewResult:
 
     if gemini_key and gemini_key != "your_gemini_api_key_here":
         genai.configure(api_key=gemini_key)
-        model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        model = config.GEMINI_MODEL
         client = genai.GenerativeModel(model)
         instructor_client = instructor.from_gemini(client, mode=instructor.Mode.GEMINI_JSON)
     elif groq_key:
         client = Groq(api_key=groq_key)
         instructor_client = instructor.from_groq(client, mode=instructor.Mode.JSON)
-        model = "llama3-70b-8192"
+        model = config.GROQ_MODEL
     else:
         raise ValueError("No LLM API keys configured (GEMINI_API_KEY or GROQ_API_KEY)")
 

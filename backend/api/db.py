@@ -1,4 +1,5 @@
 import psycopg2
+import uuid
 from psycopg2.extras import RealDictCursor
 import os
 import json
@@ -34,13 +35,14 @@ def create_project(user_id: str, repo_url: str, name: str, tags: list, visibilit
     conn = get_db_connection()
     try:
         visibility_val = visibility.value if hasattr(visibility, 'value') else visibility
+        project_id = str(uuid.uuid4())[:8]
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
-                INSERT INTO projects (user_id, repo_url, name, tags, visibility) 
-                VALUES (%s, %s, %s, %s::json, %s) RETURNING *
+                INSERT INTO projects (id, user_id, repo_url, name, tags, visibility) 
+                VALUES (%s, %s, %s, %s, %s::json, %s) RETURNING *
                 """,
-                (user_id, repo_url, name, json.dumps(tags), visibility_val)
+                (project_id, user_id, repo_url, name, json.dumps(tags), visibility_val)
             )
             project = cur.fetchone()
         conn.commit()

@@ -13,7 +13,7 @@ def create_run(db: Session, run_id: str, repo_url: str, team_name: str, leader_n
         team_name=team_name,
         leader_name=leader_name,
         branch_name=branch_name,
-        status="running"
+        status=models.RunStatusEnum.running
     )
     db.add(db_run)
     db.commit()
@@ -52,7 +52,7 @@ def create_iteration(db: Session, run_id: str, iteration_number: int):
     db_iter = models.Iteration(
         run_id=run_id,
         iteration_number=iteration_number,
-        status="running"
+        status=models.IterationStatusEnum.running
     )
     db.add(db_iter)
     db.commit()
@@ -96,7 +96,7 @@ def create_fix(
         line_number=line_number,
         commit_message=commit_message,
         confidence_score=confidence_score,
-        status=status
+        status=models.FixStatusEnum.applied
     )
     db.add(db_fix)
     db.commit()

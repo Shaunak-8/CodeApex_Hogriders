@@ -10,13 +10,16 @@ except ImportError:
 
 # ✅ KEEP THIS (YOUR DB INTEGRATION)
 from db.db import engine
-from db.models import Base
+
 
 from api.routes import router as api_router
 from api.sse import router as sse_router
 
+# Auto-create tables (using Neon)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from db.db import engine, Base
+    from db.models import User, Project, Run, Iteration, Fix, Issue, Task
     print("🔥 Creating tables in Neon...")
     Base.metadata.create_all(bind=engine)
     yield
@@ -54,6 +57,15 @@ if __name__ == "__main__":
         "main:app", 
         host="0.0.0.0", 
         port=8001, 
-        reload=True,
-        reload_excludes=["workspaces/*", "results/*", "**/__pycache__/*", "*.log"]
+        reload=False,
+        reload_excludes=[
+            "workspaces", 
+            "workspaces/*", 
+            "results", 
+            "results/*", 
+            "**/__pycache__/*", 
+            "*.log", 
+            ".git", 
+            ".git/*"
+        ]
     )

@@ -1,6 +1,7 @@
 import os
 from groq import Groq
 import google.generativeai as genai
+import config
 
 from agents.schema import FailureRecord
 
@@ -66,14 +67,14 @@ Return ONLY the complete fixed file content. No markdown, no explanations."""
                     print(f"Gemini API error: {ge}. Falling back to Groq if possible.")
                     if not self.groq_client: return {}
                     response = self.groq_client.chat.completions.create(
-                        model=os.getenv("GROQ_MODEL", "llama3-8b-8192"),
+                        model=config.GROQ_MODEL,
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.0
                     )
                     fixed_code = response.choices[0].message.content.strip()
             else:
                 response = self.groq_client.chat.completions.create(
-                    model=os.getenv("GROQ_MODEL", "llama3-8b-8192"),
+                    model=config.GROQ_MODEL,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.0
                 )
@@ -134,7 +135,7 @@ Return ONLY the fixed python code snippet. No markdown blocks, no explanations.
     if gemini_key and gemini_key != "your_gemini_api_key_here":
         try:
             genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-flash"))
+            model = genai.GenerativeModel(config.GEMINI_MODEL)
             response = model.generate_content(prompt)
             return response.text.strip()
         except Exception as e:
@@ -147,7 +148,7 @@ Return ONLY the fixed python code snippet. No markdown blocks, no explanations.
     try:
         client = Groq(api_key=groq_key)
         response = client.chat.completions.create(
-            model=os.getenv("GROQ_MODEL", "llama3-8b-8192"),
+            model=config.GROQ_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0
         )

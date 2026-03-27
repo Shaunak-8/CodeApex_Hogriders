@@ -6,6 +6,7 @@ import time
 import logging
 from groq import Groq
 import google.generativeai as genai
+import config
 
 
 from agents.analyzer import AnalyzerAgent
@@ -53,13 +54,13 @@ class OrchestratorAgent:
         api_key = os.getenv("GROQ_API_KEY")
         # Allow the agent to run in "analysis-only" mode when Groq isn't configured.
         # Fix generation will gracefully no-op in that case.
-        self.groq_client = Groq(api_key=api_key) if api_key else None
+        self.groq_client = Groq(api_key=config.GROQ_API_KEY) if config.GROQ_API_KEY else None
         
         # Gemini Support
-        gemini_key = os.getenv("GEMINI_API_KEY")
+        gemini_key = config.GEMINI_API_KEY
         if gemini_key and gemini_key != "your_gemini_api_key_here":
             genai.configure(api_key=gemini_key)
-            self.gemini_model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-flash"))
+            self.gemini_model = genai.GenerativeModel(config.GEMINI_MODEL)
         else:
             self.gemini_model = None
 
@@ -104,7 +105,7 @@ class OrchestratorAgent:
             )
             state["db_iteration_id"] = iteration.id
 
-        failures = self.analyzer.run(state["repo_path"])
+        failures = self.analyzer.run(state["repo_path"], run_id=run_id)
         state["failures"] = failures
         
         # Health score (before) = 100 - (failures * 5), capped at 0
@@ -273,7 +274,7 @@ class OrchestratorAgent:
             state["failures"] = [] # Clear failures list on success
         else:
             # Refresh failures on failure to get accurate final count
-            latest_failures = self.analyzer.analyze(state["repo_path"])
+            latest_failures = self.analyzer.run(state["repo_path"], run_id=run_id)
             state["failures"] = latest_failures
             remaining_failures = len(latest_failures)
             
