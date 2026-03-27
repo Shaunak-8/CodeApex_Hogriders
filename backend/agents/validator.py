@@ -22,3 +22,8 @@ class ValidatorAgent:
             "remaining_failures": res["failed"],
             "output": res["output"]
         }
+
+def validate_fix(fix: str, failure) -> bool:
+    agent = ValidatorAgent()
+    result = agent.validate(".", {}, {})
+    return result.get("decision") == "ACCEPT"

@@ -38,3 +38,12 @@ class ReporterAgent:
             json.dump(results, f, indent=4)
             
         return results
+
+def report_result(attempt: int, success: bool, fix: str):
+    agent = ReporterAgent()
+    agent.build_results({
+        "run_id": f"attempt_{attempt}",
+        "success": success,
+        "commits": 1 if success else 0,
+        "total_time": 100
+    })
