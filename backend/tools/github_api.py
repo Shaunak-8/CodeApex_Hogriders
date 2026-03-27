@@ -23,25 +23,25 @@ async def get_user_repositories():
             if response.status_code != 200:
                 error_msg = f"GitHub API failed with status {response.status_code}: {response.text}"
                 raise RuntimeError(error_msg)
+            
+            repos = response.json()
     except Exception as e:
         # Re-raise or propagate with context
         print(f"Error in get_user_repositories: {e}")
         raise
-            
-    repos = response.json()
     
     # Format for frontend consumption
     return [
         {
-            "id": repo["id"],
-            "name": repo["name"],
-            "full_name": repo["full_name"],
-            "private": repo["private"],
-            "html_url": repo["html_url"],
-            "description": repo["description"],
-            "language": repo["language"],
+            "id": repo.get("id"),
+            "name": repo.get("name"),
+            "full_name": repo.get("full_name"),
+            "private": repo.get("private"),
+            "html_url": repo.get("html_url"),
+            "description": repo.get("description"),
+            "language": repo.get("language"),
             "stars": repo.get("stargazers_count", 0),
-            "updated_at": repo["updated_at"]
+            "updated_at": repo.get("updated_at")
         }
         for repo in repos
     ]

@@ -24,21 +24,16 @@ export default function ConnectRepoPage() {
   const fetchRepos = async () => {
     setLoading(true);
     setError(null);
-    console.log("DEBUG: fetchRepos called. Session:", session ? "exists" : "null");
     
     try {
       const data = await getRepos();
-      console.log("DEBUG: getRepos response data:", data);
       
       if (data && data.repos) {
-        console.log(`DEBUG: Successfully fetched ${data.repos.length} repos`);
         setRepos(data.repos);
       } else {
-        console.warn("DEBUG: No repos found in response data", data);
         setRepos([]);
       }
     } catch (e) {
-      console.error("DEBUG: Error fetching repos:", e);
       setError(e.response?.data?.detail || e.message);
     } finally {
       setLoading(false);
@@ -49,7 +44,6 @@ export default function ConnectRepoPage() {
     if (!authLoading && session?.access_token) {
       fetchRepos();
     } else if (!authLoading && !session?.access_token) {
-      console.warn("DEBUG: No access token found in session");
       setLoading(false);
     }
   }, [session, authLoading]);
@@ -138,7 +132,7 @@ export default function ConnectRepoPage() {
                    <GitBranch size={18} color={selectedRepo?.id === repo.id ? '#00ff88' : '#555'} />
                    <div style={styles.itemMeta}>
                       <span style={styles.itemName}>{repo.name}</span>
-                      <a href={repo.html_url} target="_blank" rel="prev" onClick={e => e.stopPropagation()} style={styles.link}>
+                      <a href={repo.html_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={styles.link}>
                         <ExternalLink size={12} />
                       </a>
                    </div>

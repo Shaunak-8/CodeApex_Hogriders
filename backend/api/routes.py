@@ -98,9 +98,27 @@ async def fetch_github_repos(request: Request):
         repos = await get_user_repositories()
         logger.info(f"Successfully fetched {len(repos)} repos from GitHub API")
         return {"repos": repos}
+    except HTTPException:
+        # Propagation for existing HTTPExceptions (like from verify_token)
+        raise
+    except ValueError as e:
+        # Typically missing GITHUB_TOKEN
+        logger.error(f"Configuration error fetching repos: {e}")
+        raise HTTPException(status_code=401, detail=str(e))
+    except RuntimeError as e:
+        # GitHub API errors (mapped from 401/403 if present in message)
+        err_msg = str(e)
+        status = 502 # Bad Gateway as default for upstream failure
+        if "401" in err_msg:
+            status = 401
+        elif "403" in err_msg:
+            status = 403
+        
+        logger.error(f"GitHub API error in route: {err_msg}")
+        raise HTTPException(status_code=status, detail=err_msg)
     except Exception as e:
-        logger.error(f"Failed to fetch GitHub repos in route: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error fetching GitHub repos: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching repositories.")
 
 # ---------------- PROJECT ENDPOINTS ---------------- #
 
