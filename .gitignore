@@ -163,3 +163,4 @@ dist-ssr
 
 # Project specific results
 backend/results/
+.env

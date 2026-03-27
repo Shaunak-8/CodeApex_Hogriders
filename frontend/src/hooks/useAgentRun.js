@@ -3,6 +3,7 @@ import { runAgent } from '../lib/api';
 import { useCallback } from 'react';
 
 export const useAgentRun = () => {
+    const projectId = useAgentStore((s) => s.projectId);
     const repoUrl = useAgentStore((s) => s.repoUrl);
     const teamName = useAgentStore((s) => s.teamName);
     const leaderName = useAgentStore((s) => s.leaderName);
@@ -20,6 +21,7 @@ export const useAgentRun = () => {
 
         try {
             const result = await runAgent({ 
+                project_id: projectId,
                 repo_url: repoUrl, 
                 team_name: teamName, 
                 leader_name: leaderName 
@@ -29,7 +31,7 @@ export const useAgentRun = () => {
             console.error('Failed to start run', error);
             setStatus('failed');
         }
-    }, [repoUrl, teamName, leaderName, reset, setStatus, setStartTime, setRunId]);
+    }, [projectId, repoUrl, teamName, leaderName, reset, setStatus, setStartTime, setRunId]);
 
     return { startRun };
 };

@@ -6,12 +6,17 @@ import agents.validator as validator
 import agents.reporter as reporter
 import sys
 import os
+import json
 import time
 from agents.analyzer import AnalyzerAgent
 from agents.fixer import FixerRouter
 from agents.validator import ValidatorAgent
 from agents.reporter import ReporterAgent
 from agents.memory import MemoryAgent
+from core.dependency_graph import DependencyGraph
+from core.failure_ledger import FailureLedger
+from core.confidence import calculate as calc_confidence
+from core.context_builder import ContextBuilder
 from api.sse import emit
 from groq import Groq
 
@@ -27,6 +32,9 @@ class AgentState(TypedDict):
     max_retries: int
     status: str
     results: Optional[dict]
+    causal_graph: Optional[dict]
+    health_before: int
+    health_after: int
 
 class OrchestratorAgent:
     def __init__(self):
@@ -35,36 +43,22 @@ class OrchestratorAgent:
         self.validator = ValidatorAgent()
         self.reporter = ReporterAgent()
         self.memory = MemoryAgent()
+        self.dep_graph = DependencyGraph()
+        self.ledger = FailureLedger()
+        self.context_builder = ContextBuilder()
         
-        # Initialize Groq client
         self.groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
         
-        # Build LangGraph
         workflow = StateGraph(AgentState)
-        
         workflow.add_node("analyze", self.analyze_node)
         workflow.add_node("fix", self.fix_node)
         workflow.add_node("validate", self.validate_node)
         workflow.add_node("report", self.report_node)
         
         workflow.add_edge(START, "analyze")
-        workflow.add_conditional_edges(
-            "analyze",
-            self.should_fix,
-            {
-                "continue": "fix",
-                "end": "report"
-            }
-        )
+        workflow.add_conditional_edges("analyze", self.should_fix, {"continue": "fix", "end": "report"})
         workflow.add_edge("fix", "validate")
-        workflow.add_conditional_edges(
-            "validate",
-            self.should_retry,
-            {
-                "retry": "analyze",
-                "end": "report"
-            }
-        )
+        workflow.add_conditional_edges("validate", self.should_retry, {"retry": "analyze", "end": "report"})
         workflow.add_edge("report", END)
         
         self.app = workflow.compile()
@@ -76,52 +70,107 @@ class OrchestratorAgent:
         failures = self.analyzer.run(state["repo_path"])
         state["failures"] = failures
         
+        # Health score (before) = 100 - (failures * 5), capped at 0
+        state["health_before"] = max(0, 100 - len(failures) * 5)
+        
         if failures:
             emit(run_id, "AnalyzerAgent", f"Detected {len(failures)} failures.", "FAILURE_DETECTED")
+            
+            # Build dependency graph
+            self.dep_graph.build_from_failures(failures, state["repo_path"])
+            graph_data = self.dep_graph.to_dict()
+            
+            # Annotate nodes with status
+            graph_data["nodes"] = [{"id": n, "status": "failing"} for n in graph_data["nodes"]]
+            state["causal_graph"] = graph_data
+            
+            root_nodes = self.dep_graph.get_root_nodes()
+            emit(run_id, "OrchestratorAgent", f"Built dependency graph. Root cause nodes: {root_nodes}", "GRAPH_BUILT")
         else:
             emit(run_id, "AnalyzerAgent", "No failures detected.", "ANALYSIS_COMPLETED")
             
         return state
 
     def should_fix(self, state: AgentState):
-        if not state["failures"]:
-            return "end"
-        return "continue"
+        return "end" if not state["failures"] else "continue"
 
     def fix_node(self, state: AgentState):
         run_id = state["run_id"]
         repo_path = state["repo_path"]
         
-        for failure in state["failures"]:
-            emit(run_id, "OrchestratorAgent", f"Routing {failure['bug_type']} in {failure['file']}...", "FIX_ROUTED")
+        # Sort by root cause: fix root nodes first
+        root_nodes = set(self.dep_graph.get_root_nodes())
+        sorted_failures = sorted(state["failures"], key=lambda f: 0 if f["file"] in root_nodes else 1)
+        
+        for failure in sorted_failures:
+            file_key = failure["file"]
+            bug_type = failure["bug_type"]
+            strategy = f"{bug_type}:{failure.get('error_message', '')[:50]}"
             
-            AgentClass = self.router.route(failure["bug_type"])
-            # In production, context_builder would be passed here
-            # For now using a mock/simple context builder or dependency
-            from core.context_builder import ContextBuilder
-            cb = ContextBuilder()
+            # Check ledger — skip if already tried
+            if self.ledger.was_tried(file_key, strategy):
+                emit(run_id, "MemoryAgent", f"Skipping {file_key} — strategy already tried.", "FIX_ROUTED")
+                continue
             
-            agent = AgentClass(self.groq_client, cb)
+            emit(run_id, "OrchestratorAgent", f"Routing {bug_type} in {file_key}...", "FIX_ROUTED")
             
-            # Use memory for history
-            history = self.memory.get_context(failure["file"], failure.get("line", 0))
+            AgentClass = self.router.route(bug_type)
+            agent = AgentClass(self.groq_client, self.context_builder)
+            
+            # Memory history
+            history = self.memory.get_context(file_key, failure.get("line", 0))
+            
+            # Blast radius
+            try:
+                blast = self.dep_graph.get_blast_radius(file_key)
+            except ValueError:
+                blast = 1
             
             fix_res = agent.fix(failure, repo_path, history)
             
             if fix_res and fix_res.get("fixed_code"):
-                # Apply fix to file
-                full_path = os.path.join(repo_path, failure["file"])
+                # Apply fix
+                full_path = os.path.join(repo_path, file_key)
+                try:
+                    with open(full_path, "r") as f:
+                        before_code = f.read()
+                except Exception:
+                    before_code = ""
+                    
                 with open(full_path, "w") as f:
                     f.write(fix_res["fixed_code"])
                 
-                fix_res["status"] = "applied"
-                fix_res["file"] = failure["file"]
-                fix_res["bug_type"] = failure["bug_type"]
-                state["fixes_applied"].append(fix_res)
+                # Confidence
+                conf = calc_confidence({
+                    "bug_type": bug_type,
+                    "lines_changed": abs(len(fix_res["fixed_code"].splitlines()) - len(before_code.splitlines())),
+                    "blast_radius": blast,
+                    "touches_imports": "import" in fix_res["fixed_code"][:200],
+                })
                 
-                emit(run_id, agent.specialty + "Agent", f"Applied fix to {failure['file']}: {fix_res.get('explanation', '')}", "FIX_APPLIED")
+                fix_entry = {
+                    "file": file_key,
+                    "bug_type": bug_type,
+                    "agent": agent.specialty,
+                    "explanation": fix_res.get("explanation", ""),
+                    "confidence": conf["score"],
+                    "blast_radius": blast,
+                    "status": "applied",
+                    "before_code": before_code[:500],
+                    "fixed_code": fix_res["fixed_code"][:500],
+                }
+                state["fixes_applied"].append(fix_entry)
+                
+                # Record in ledger and memory
+                self.ledger.add_attempt(file_key, strategy, "applied")
+                self.memory.record(file_key, failure.get("line", 0), strategy, "applied")
+                
+                emit(run_id, agent.specialty + "Agent", 
+                     json.dumps(fix_entry),
+                     "FIX_APPLIED")
             else:
-                emit(run_id, "OrchestratorAgent", f"Failed to generate fix for {failure['file']}", "FIX_FAILED")
+                self.ledger.add_attempt(file_key, strategy, "failed")
+                emit(run_id, "OrchestratorAgent", f"Failed to generate fix for {file_key}", "FIX_FAILED")
                 
         return state
 
@@ -129,7 +178,6 @@ class OrchestratorAgent:
         run_id = state["run_id"]
         emit(run_id, "ValidatorAgent", "Validating fixes...", "VALIDATION_STARTED")
         
-        # Simplified validation: just run analyzer again
         val_res = self.validator.validate(state["repo_path"])
         
         if val_res["status"] == "PASS":
@@ -144,25 +192,33 @@ class OrchestratorAgent:
     def should_retry(self, state: AgentState):
         if state["status"] == "PASSED":
             return "end"
-        
         state["iteration"] += 1
         if state["iteration"] < state["max_retries"]:
             return "retry"
-        
         return "end"
 
     def report_node(self, state: AgentState):
         run_id = state["run_id"]
         emit(run_id, "ReporterAgent", "Generating final report...", "COMMIT_STARTED")
         
-        # Commit and push
+        # Git commit and push
         try:
-            from tools.git_ops import commit_and_push
+            from tools.git_ops import commit_and_push_all
             branch_name = f"{state['team_name']}_{state['leader_name']}_AI_Fix"
-            commit_and_push(state["repo_path"], "[AI-AGENT] Applied autonomous fixes", branch_name)
+            commit_and_push_all(state["repo_path"], "[AI-AGENT] Applied autonomous fixes", branch_name)
             emit(run_id, "GitAgent", f"Pushed fixes to branch {branch_name}", "COMMIT_DONE")
         except Exception as e:
             emit(run_id, "GitAgent", f"Git push failed: {str(e)}", "COMMIT_FAILED")
+
+        # Health after
+        state["health_after"] = max(0, 100 - (len(state["failures"]) - len(state["fixes_applied"])) * 5)
+        
+        # Update causal graph status
+        fixed_files = {f["file"] for f in state["fixes_applied"]}
+        if state.get("causal_graph"):
+            for node in state["causal_graph"].get("nodes", []):
+                if node["id"] in fixed_files:
+                    node["status"] = "fixed"
 
         results = self.reporter.build_results(
             run_id=run_id,
@@ -170,16 +226,18 @@ class OrchestratorAgent:
             final_status=state["status"],
             iterations=state["iteration"] + 1,
             failures_log=state["failures"],
-            fixes=state["fixes_applied"]
+            fixes=state["fixes_applied"],
+            health_score={"before": state.get("health_before", 0), "after": state.get("health_after", 0)},
+            causal_graph=state.get("causal_graph", {"nodes": [], "edges": []}),
         )
         state["results"] = results
         
-        emit(run_id, "OrchestratorAgent", "Run completed.", "RUN_COMPLETED")
+        # Emit final result as JSON for frontend to parse
+        emit(run_id, "OrchestratorAgent", json.dumps(results), "RUN_COMPLETED")
         return state
 
     def run(self, run_id: str, repo_url: str, repo_path: str, team_name: str = "", leader_name: str = ""):
         max_retries = int(os.getenv("MAX_RETRIES", 5))
-        
         emit(run_id, "OrchestratorAgent", f"Run started for {repo_url}", "RUN_STARTED")
         
         initial_state = {
@@ -193,7 +251,10 @@ class OrchestratorAgent:
             "iteration": 0,
             "max_retries": max_retries,
             "status": "RUNNING",
-            "results": None
+            "results": None,
+            "causal_graph": None,
+            "health_before": 0,
+            "health_after": 0,
         }
         
         return self.app.invoke(initial_state)

@@ -24,25 +24,51 @@ export const useAgentSSE = (runId) => {
         const data = JSON.parse(event.data);
         if (data.type === 'heartbeat') return;
 
-        if (data.type === 'thought') {
-          appendThought(data);
-        } else if (data.type === 'fix') {
-          appendThought(data);
-          appendFix(data);
-        } else if (data.type === 'result') {
-          const result = JSON.parse(data.message);
-          setScore(result.score);
-          setHealthScore(result.health_score);
-          setCausalGraph(result.causal_graph);
-          setTotals(result.total_failures, result.total_fixes);
-          setStatus('passed');
-          setEndTime(new Date().toISOString());
-          es.close();
-        } else if (data.type === 'error') {
-          appendThought(data);
-          setStatus('failed');
-          setEndTime(new Date().toISOString());
-          es.close();
+        // Always add to thought stream
+        appendThought(data);
+
+        // Handle specific event types
+        switch (data.type) {
+          case 'FIX_APPLIED':
+            // Try to parse fix data from message
+            try {
+              const fixData = JSON.parse(data.message);
+              appendFix(fixData);
+            } catch {
+              appendFix({
+                file: data.agent,
+                bug_type: 'FIX',
+                explanation: data.message,
+                status: 'applied',
+              });
+            }
+            break;
+
+          case 'RUN_COMPLETED':
+            // Try to extract result data
+            try {
+              const result = JSON.parse(data.message);
+              if (result.score) setScore(result.score);
+              if (result.health_score) setHealthScore(result.health_score);
+              if (result.causal_graph) setCausalGraph(result.causal_graph);
+              if (result.total_failures !== undefined) setTotals(result.total_failures, result.total_fixes);
+            } catch {
+              // Not JSON — just a status message
+            }
+            setStatus('passed');
+            setEndTime(new Date().toISOString());
+            es.close();
+            break;
+
+          case 'RUN_FAILED':
+          case 'error':
+            setStatus('failed');
+            setEndTime(new Date().toISOString());
+            es.close();
+            break;
+
+          default:
+            break;
         }
       } catch (e) {
         console.error('SSE parse error:', e);

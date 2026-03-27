@@ -3,7 +3,9 @@ import os
 from datetime import datetime
 
 class ReporterAgent:
-    def build_results(self, run_id: str, repo_url: str, final_status: str, iterations: int, failures_log: list, fixes: list) -> dict:
+    def build_results(self, run_id: str, repo_url: str, final_status: str, iterations: int, 
+                      failures_log: list, fixes: list, 
+                      health_score: dict = None, causal_graph: dict = None) -> dict:
         total_failures = len(failures_log)
         total_fixes = len([f for f in fixes if f.get("status") == "applied"])
         
@@ -11,7 +13,7 @@ class ReporterAgent:
         base_score = 100
         bonus = 10 if final_status == "PASSED" and iterations < 3 else 0
         penalty = (iterations - 1) * 5 if iterations > 1 else 0
-        final_score = base_score + bonus - penalty
+        final_score = max(0, base_score + bonus - penalty)
 
         results = {
             "run_id": run_id,
@@ -24,17 +26,18 @@ class ReporterAgent:
                 "base": base_score,
                 "bonus": bonus,
                 "penalty": penalty,
-                "final": max(0, final_score)
+                "final": final_score,
+                "total": final_score,  # alias for frontend compat
             },
+            "health_score": health_score or {"before": 0, "after": 0},
+            "causal_graph": causal_graph or {"nodes": [], "edges": []},
             "fixes": fixes,
+            "branch": "HOGRIDERS_AI_Fix",
             "timestamp": datetime.utcnow().isoformat()
         }
         
-        # Ensure results directory exists
         os.makedirs("results", exist_ok=True)
-        results_file = os.path.join("results", f"{run_id}.json")
-        
-        with open(results_file, "w") as f:
+        with open(os.path.join("results", f"{run_id}.json"), "w") as f:
             json.dump(results, f, indent=4)
             
         return results
