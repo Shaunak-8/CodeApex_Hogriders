@@ -80,7 +80,7 @@ def run_pytest(path: str) -> list:
     return failures
 
 def run_eslint(path: str) -> list:
-    if not shutil.which("npx"):
+    if not shutil.which("npx") or not os.path.exists(os.path.join(path, "package.json")):
         return []
     code, stdout, _ = _run_tool(["npx", "eslint", ".", "--format=compact"], cwd=path)
     failures = []
@@ -103,7 +103,7 @@ def run_eslint(path: str) -> list:
     return failures
 
 def run_jest(path: str) -> list:
-    if not shutil.which("npx"):
+    if not shutil.which("npx") or not os.path.exists(os.path.join(path, "package.json")):
         return []
     code, stdout, stderr = _run_tool(["npx", "jest", "--no-coverage", "--json"], cwd=path)
     if code != 0:

@@ -1,90 +1,88 @@
-import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from config import DATABASE_URL
+import os
+import json
 
-def get_connection():
-    """Get a database connection."""
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-def init_db():
-    """Initialize database tables if they don't exist."""
-    conn = get_connection()
-    cur = conn.cursor()
-    
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id TEXT PRIMARY KEY,
-            email TEXT
-        );
-    """)
-    
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS runs (
-            id TEXT PRIMARY KEY,
-            user_id TEXT REFERENCES users(id),
-            repo_url TEXT,
-            status TEXT DEFAULT 'started',
-            score_total INTEGER DEFAULT 0,
-            results_json JSONB,
-            created_at TIMESTAMP DEFAULT NOW()
-        );
-    """)
-    
-    cur.execute("""
-        CREATE INDEX IF NOT EXISTS idx_runs_user_id ON runs(user_id);
-    """)
-    
-    conn.commit()
-    cur.close()
-    conn.close()
+def get_db_connection():
+    return psycopg2.connect(DATABASE_URL)
 
 def ensure_user(user_id: str, email: str):
-    """Create or update user in the database."""
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO users (id, email) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET email = %s",
-        (user_id, email, email),
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO users (id, email) VALUES (%s, %s) ON CONFLICT (id) DO NOTHING",
+                (user_id, email)
+            )
+        conn.commit()
+    finally:
+        conn.close()
 
 def create_run(run_id: str, user_id: str, repo_url: str):
-    """Insert a new run record."""
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO runs (id, user_id, repo_url) VALUES (%s, %s, %s)",
-        (run_id, user_id, repo_url),
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO runs (id, user_id, repo_url, status, start_time) VALUES (%s, %s, %s, 'STARTED', NOW())",
+                (run_id, user_id, repo_url)
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+def update_run_result(run_id: str, result: dict):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE runs SET 
+                    status = %s, 
+                    total_failures = %s, 
+                    total_fixes = %s, 
+                    score_total = %s, 
+                    results_json = %s, 
+                    end_time = NOW() 
+                WHERE id = %s
+                """,
+                (
+                    result.get("status"),
+                    result.get("total_failures"),
+                    result.get("total_fixes"),
+                    result.get("score", {}).get("final"),
+                    json.dumps(result),
+                    run_id
+                )
+            )
+            
+            # Insert individual fixes
+            for f in result.get("fixes", []):
+                cur.execute(
+                    """
+                    INSERT INTO fixes (run_id, file, bug_type, agent_used, confidence, blast_radius, status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        run_id,
+                        f.get("file"),
+                        f.get("bug_type"),
+                        f.get("agent", "Specialist"),
+                        f.get("confidence", 0),
+                        f.get("blast_radius", 1),
+                        f.get("status")
+                    )
+                )
+        conn.commit()
+    finally:
+        conn.close()
 
 def get_user_runs(user_id: str):
-    """Get all runs for a specific user."""
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT * FROM runs WHERE user_id = %s ORDER BY created_at DESC",
-        (user_id,),
-    )
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    return [dict(r) for r in rows]
-
-def update_run(run_id: str, status: str, score_total: int = 0, results_json: dict = None):
-    """Update a run's status and results."""
-    conn = get_connection()
-    cur = conn.cursor()
-    import json
-    cur.execute(
-        "UPDATE runs SET status = %s, score_total = %s, results_json = %s WHERE id = %s",
-        (status, score_total, json.dumps(results_json) if results_json else None, run_id),
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM runs WHERE user_id = %s ORDER BY start_time DESC", (user_id,))
+            return cur.fetchall()
+    finally:
+        conn.close()
