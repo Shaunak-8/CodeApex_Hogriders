@@ -268,7 +268,15 @@ class OrchestratorAgent:
             emit(run_id, "GitAgent", f"Git push failed: {str(e)}", "COMMIT_FAILED")
 
         # Health after
-        remaining_failures = len(state["failures"])
+        if state["status"] == "PASSED":
+            remaining_failures = 0
+            state["failures"] = [] # Clear failures list on success
+        else:
+            # Refresh failures on failure to get accurate final count
+            latest_failures = self.analyzer.analyze(state["repo_path"])
+            state["failures"] = latest_failures
+            remaining_failures = len(latest_failures)
+            
         state["health_after"] = max(0, 100 - (remaining_failures * 5))
         
         # Update causal graph status
