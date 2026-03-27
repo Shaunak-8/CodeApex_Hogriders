@@ -5,19 +5,27 @@ from agents.schema import FailureRecord
 class FixerRouter:
     @staticmethod
     def route(bug_type: str):
-        if bug_type == "LINTING": return PythonFixerAgent
-        if bug_type == "TYPE_ERROR": return TypeFixerAgent
-        if bug_type == "SYNTAX": return SyntaxFixerAgent
-        if bug_type == "LOGIC": return LogicFixerAgent
-        if bug_type == "IMPORT": return ImportFixerAgent
-        return PythonFixerAgent
+        mapping = {
+            "LINTING": PythonFixerAgent,
+            "TYPE_ERROR": TypeFixerAgent,
+            "SYNTAX": SyntaxFixerAgent,
+            "LOGIC": LogicFixerAgent,
+            "IMPORT": ImportFixerAgent,
+            "JS": JSFixerAgent
+        }
+        return mapping.get(bug_type, PythonFixerAgent)
 
 class BaseFixerAgent:
-    def __init__(self, groq_client, ledger, context_builder):
+    def __init__(self, groq_client: Groq, context_builder):
         self.groq_client = groq_client
-        self.ledger = ledger
         self.context_builder = context_builder
-        self.prompt = ""
+        self.system_prompt = "You are a senior {specialty} engineer. Fix the provided code failure."
+        self.specialty = "software"
+        
+    def fix(self, failure: dict, repo_path: str, history: list = None) -> dict:
+        # Build context
+        file_path = os.path.join(repo_path, failure["file"])
+        context = self.context_builder.build(file_path, repo_path)
         
     def fix(self, failure, context_bundle) -> dict:
         for _ in range(3):
