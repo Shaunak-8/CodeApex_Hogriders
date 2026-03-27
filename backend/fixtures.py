@@ -4,8 +4,8 @@ def get_fixtures():
 =================================== FAILURES ===================================
 __________________________________ test_add __________________________________
     def test_add():
->       assert add(2, 3) == 5
-E       AssertionError: assert 5 == 5
+>       assert add(2, 3) == 6
+E       AssertionError: assert 5 == 6
 
 backend/tests/test_math.py:10: AssertionError
         """,

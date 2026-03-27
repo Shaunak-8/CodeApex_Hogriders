@@ -5,6 +5,8 @@ import json
 import time
 import logging
 from groq import Groq
+import google.generativeai as genai
+
 
 from agents.analyzer import AnalyzerAgent
 from agents.fixer import FixerRouter
@@ -53,6 +55,14 @@ class OrchestratorAgent:
         # Fix generation will gracefully no-op in that case.
         self.groq_client = Groq(api_key=api_key) if api_key else None
         
+        # Gemini Support
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        if gemini_key and gemini_key != "your_gemini_api_key_here":
+            genai.configure(api_key=gemini_key)
+            self.gemini_model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-flash"))
+        else:
+            self.gemini_model = None
+
         self.analyzer = AnalyzerAgent()
         self.router = FixerRouter()
         self.validator = ValidatorAgent()
@@ -62,6 +72,7 @@ class OrchestratorAgent:
         self.dep_graph = DependencyGraph()
         self.ledger = FailureLedger()
         self.context_builder = ContextBuilder()
+
         
         workflow = StateGraph(AgentState)
         workflow.add_node("analyze", self.analyze_node)
@@ -144,7 +155,8 @@ class OrchestratorAgent:
             emit(run_id, "OrchestratorAgent", f"Routing {bug_type} fix for {file_key}...", "FIX_ROUTED")
             
             AgentClass = self.router.route(bug_type)
-            agent = AgentClass(self.groq_client, self.context_builder)
+            agent = AgentClass(self.groq_client, self.context_builder, gemini_model=self.gemini_model)
+
             
             # Memory history
             history = self.memory.get_context(file_key, failure.get("line", 0))
