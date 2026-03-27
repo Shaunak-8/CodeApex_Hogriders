@@ -1,0 +1,50 @@
+import { create } from 'zustand';
+
+export const useAgentStore = create((set) => ({
+  repoUrl: "",
+  teamName: "",
+  leaderName: "",
+  runId: null,
+  status: "idle", // "idle" | "running" | "passed" | "failed"
+  thoughts: [],
+  fixes: [],
+  cicdRuns: [],
+  score: { base: 100, speed_bonus: 0, efficiency_penalty: 0, total: 100 },
+  healthScore: { before: 0, after: 0 },
+  causalGraph: { nodes: [], edges: [] },
+  startTime: null,
+  endTime: null,
+  totalFailures: 0,
+  totalFixes: 0,
+  branch: "HOGRIDERS_EKLAVYA_PURI_AI_Fix",
+  
+  // Actions
+  setRepoUrl: (url) => set({ repoUrl: url }),
+  setTeamName: (name) => set({ teamName: name }),
+  setLeaderName: (name) => set({ leaderName: name }),
+  setStatus: (status) => set({ status }),
+  appendThought: (thought) => set((state) => ({ thoughts: [...state.thoughts, thought] })),
+  appendFix: (fix) => set((state) => ({ fixes: [...state.fixes, fix] })),
+  appendCicdRun: (run) => set((state) => ({ cicdRuns: [...state.cicdRuns, run] })),
+  setScore: (score) => set({ score }),
+  setHealthScore: (healthScore) => set({ healthScore }),
+  setCausalGraph: (causalGraph) => set({ causalGraph }),
+  setRunId: (runId) => set({ runId }),
+  setStartTime: (startTime) => set({ startTime }),
+  setEndTime: (endTime) => set({ endTime }),
+  setTotals: (failures, fixes) => set({ totalFailures: failures, totalFixes: fixes }),
+  reset: () => set({
+    runId: null,
+    status: "idle",
+    thoughts: [],
+    fixes: [],
+    cicdRuns: [],
+    score: { base: 100, speed_bonus: 0, efficiency_penalty: 0, total: 100 },
+    healthScore: { before: 0, after: 0 },
+    causalGraph: { nodes: [], edges: [] },
+    startTime: null,
+    endTime: null,
+    totalFailures: 0,
+    totalFixes: 0,
+  })
+}));

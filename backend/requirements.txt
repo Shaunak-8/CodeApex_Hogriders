@@ -11,3 +11,6 @@ flake8
 mypy
 sse-starlette
 gitpython
+supabase
+python-jose[cryptography]
+psycopg2-binary
