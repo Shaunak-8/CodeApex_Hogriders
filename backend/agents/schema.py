@@ -9,5 +9,5 @@ class FailureRecord:
     message: str
     test_name: Optional[str] = None
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return asdict(self)
