@@ -40,10 +40,13 @@ class ReporterAgent:
         return results
 
 def report_result(attempt: int, success: bool, fix: str):
+    """Wrapper for CLI orchestrator. Prints result and saves to disk."""
     agent = ReporterAgent()
-    agent.build_results({
-        "run_id": f"attempt_{attempt}",
-        "success": success,
-        "commits": 1 if success else 0,
-        "total_time": 100
-    })
+    agent.build_results(
+        run_id=f"cli_attempt_{attempt}",
+        repo_url="local",
+        final_status="PASSED" if success else "FAILED",
+        iterations=attempt,
+        failures_log=[],
+        fixes=[{"status": "applied", "fixed_code": fix}] if success else []
+    )
