@@ -4,22 +4,45 @@ from typing import Optional
 from agents.schema import FailureRecord
 
 class AnalyzerAgent:
+    def __init__(self):
+        pass
+
     def run(self, repo_path: str):
+        """Run all linters and tests, return grouped failures."""
         failures = []
-        failures.extend(linters.run_flake8(repo_path))
-        failures.extend(linters.run_mypy(repo_path))
-        failures.extend(linters.run_pytest(repo_path))
-        failures.extend(linters.run_eslint(repo_path))
-        failures.extend(linters.run_jest(repo_path))
         
-        grouped = {}
+        # 1. Syntax & Linting (Fastest)
+        failures.extend(self._tag(linters.run_flake8(repo_path), "LINTING"))
+        
+        # 2. Type Checking
+        failures.extend(self._tag(linters.run_mypy(repo_path), "TYPE_ERROR"))
+        
+        # 3. JS/TS Checks
+        failures.extend(self._tag(linters.run_eslint(repo_path), "JS"))
+        
+        # 4. Logic & Tests (Execution required)
+        failures.extend(self._tag(linters.run_pytest(repo_path), "LOGIC"))
+        failures.extend(self._tag(linters.run_jest(repo_path), "JS"))
+        
+        # Deduplication and prioritization
+        # If a line has a SyntaxError, we prioritize that over logic.
+        return self._deduplicate(failures)
+
+    def _tag(self, results, bug_type):
+        for r in results:
+            if "bug_type" not in r:
+                r["bug_type"] = bug_type
+        return results
+
+    def _deduplicate(self, failures):
+        seen = {}
         for f in failures:
             key = f"{f['file']}_{f['bug_type']}"
-            if key not in grouped:
-                grouped[key] = []
-            grouped[key].append(f)
+            if key not in seen:
+                seen[key] = []
+            seen[key].append(f)
             
-        return [g[0] for g in grouped.values()]
+        return [g[0] for g in seen.values()]
 
 def parse_failure(raw_output: str) -> Optional[FailureRecord]:
     file_name = "unknown_file.py"
