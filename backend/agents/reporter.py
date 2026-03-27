@@ -1,35 +1,52 @@
 import json
 import os
+from datetime import datetime
 
 class ReporterAgent:
-    def build_results(self, run_data: dict) -> dict:
-        total_time = run_data.get("total_time", 0)
-        commits = run_data.get("commits", 0)
+    def build_results(self, run_id: str, repo_url: str, final_status: str, iterations: int, failures_log: list, fixes: list) -> dict:
+        total_failures = len(failures_log)
+        total_fixes = len([f for f in fixes if f.get("status") == "applied"])
         
-        score = 100
-        if total_time < 300:
-            score += 10
-        if commits > 20:
-            score -= ((commits - 20) * 2)
-            
-        run_id = run_data.get("run_id", "mock-123")
+        # Calculate scores
+        base_score = 100
+        bonus = 10 if final_status == "PASSED" and iterations < 3 else 0
+        penalty = (iterations - 1) * 5 if iterations > 1 else 0
+        final_score = base_score + bonus - penalty
+
         results = {
             "run_id": run_id,
-            "score": score,
-            "data": run_data
+            "repo_url": repo_url,
+            "status": final_status,
+            "total_failures": total_failures,
+            "total_fixes": total_fixes,
+            "iterations": iterations,
+            "score": {
+                "base": base_score,
+                "bonus": bonus,
+                "penalty": penalty,
+                "final": max(0, final_score)
+            },
+            "fixes": fixes,
+            "timestamp": datetime.utcnow().isoformat()
         }
         
+        # Ensure results directory exists
         os.makedirs("results", exist_ok=True)
-        with open(os.path.join("results", f"{run_id}.json"), "w") as f:
-            json.dump(results, f)
+        results_file = os.path.join("results", f"{run_id}.json")
+        
+        with open(results_file, "w") as f:
+            json.dump(results, f, indent=4)
             
         return results
 
 def report_result(attempt: int, success: bool, fix: str):
+    """Wrapper for CLI orchestrator. Prints result and saves to disk."""
     agent = ReporterAgent()
-    agent.build_results({
-        "run_id": f"attempt_{attempt}",
-        "success": success,
-        "commits": 1 if success else 0,
-        "total_time": 100
-    })
+    agent.build_results(
+        run_id=f"cli_attempt_{attempt}",
+        repo_url="local",
+        final_status="PASSED" if success else "FAILED",
+        iterations=attempt,
+        failures_log=[],
+        fixes=[{"status": "applied", "fixed_code": fix}] if success else []
+    )
