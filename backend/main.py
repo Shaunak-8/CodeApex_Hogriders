@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 try:
@@ -9,7 +10,13 @@ from db.db import engine
 from db.models import Base
 from api.routes import router as api_router
 
-app = FastAPI(title="Hogriders CI/CD Agent API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("🔥 Creating tables in Neon...")
+    Base.metadata.create_all(bind=engine)
+    yield
+
+app = FastAPI(title="Hogriders CI/CD Agent API", lifespan=lifespan)
 
 # Enable CORS
 app.add_middleware(
@@ -21,11 +28,6 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix="/api")
-
-@app.on_event("startup")
-def startup():
-    print("🔥 Creating tables in Neon...")
-    Base.metadata.create_all(bind=engine)
 
 @app.get("/health")
 def health_check():

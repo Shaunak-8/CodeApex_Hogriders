@@ -1,7 +1,6 @@
 from sqlalchemy.orm import Session
 from db import models
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from typing import Optional
 
 # ============
 # RUN CRUD
@@ -27,17 +26,18 @@ def get_runs(db: Session, skip: int = 0, limit: int = 100):
 def get_run(db: Session, run_id: str):
     return db.query(models.Run).filter(models.Run.id == run_id).first()
 
-def update_run(db: Session, run_id: str, status: str = None, overall_score: float = None, memory: dict = None):
+def update_run(db: Session, run_id: str, status: Optional[str] = None, overall_score: Optional[float] = None, memory: Optional[dict] = None):
     db_run = get_run(db, run_id)
-    if db_run:
-        if status is not None:
-            db_run.status = status
-        if overall_score is not None:
-            db_run.overall_score = overall_score
-        if memory is not None:
-            db_run.memory = memory
-        db.commit()
-        db.refresh(db_run)
+    if not db_run:
+        raise ValueError(f"Run with id '{run_id}' not found")
+    if status is not None:
+        db_run.status = status
+    if overall_score is not None:
+        db_run.overall_score = overall_score
+    if memory is not None:
+        db_run.memory = memory
+    db.commit()
+    db.refresh(db_run)
     return db_run
 
 # ============
@@ -55,7 +55,7 @@ def create_iteration(db: Session, run_id: str, iteration_number: int):
     db.refresh(db_iter)
     return db_iter
 
-def update_iteration(db: Session, iteration_id: int, status: str = None, logs: str = None):
+def update_iteration(db: Session, iteration_id: int, status: Optional[str] = None, logs: Optional[str] = None):
     db_iter = db.query(models.Iteration).filter(models.Iteration.id == iteration_id).first()
     if db_iter:
         if status is not None:
@@ -79,9 +79,9 @@ def create_fix(
     iteration_id: int, 
     file_path: str, 
     bug_type: str, 
-    line_number: int = None, 
-    commit_message: str = None,
-    confidence_score: float = None,
+    line_number: Optional[int] = None, 
+    commit_message: Optional[str] = None,
+    confidence_score: Optional[float] = None,
     status: str = "applied"
 ):
     db_fix = models.Fix(

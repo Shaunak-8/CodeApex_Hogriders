@@ -1,6 +1,5 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, JSON
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, JSON, func
 from sqlalchemy.orm import relationship
-from datetime import datetime
 from db.db import Base
 
 
@@ -24,9 +23,9 @@ class Run(Base):
     total_failures = Column(Integer, default=0)
     total_fixes = Column(Integer, default=0)
 
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Timestamps (server-side via func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     # 🔥 USP: Failure Ledger / Memory
     memory = Column(JSON, nullable=True)
@@ -61,7 +60,7 @@ class Iteration(Base):
 
     logs = Column(Text, nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, server_default=func.now())
 
     # Relationships
     run = relationship("Run", back_populates="iterations")
@@ -93,7 +92,7 @@ class Fix(Base):
 
     confidence_score = Column(Float, nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, server_default=func.now())
 
     # Relationships
     run = relationship("Run", back_populates="fixes")

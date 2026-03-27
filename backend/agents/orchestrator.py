@@ -2,6 +2,9 @@ from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, List
 import sys
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     import agents.analyzer as analyzer
@@ -9,7 +12,10 @@ try:
     import agents.validator as validator
     import agents.reporter as reporter
 except ImportError:
-    pass # Will gracefully fail if agents aren't actually stubbed
+    analyzer = None
+    fixer = None
+    validator = None
+    reporter = None
 
 from sqlalchemy.orm import Session
 from db import crud
@@ -27,13 +33,18 @@ class AgentState(TypedDict):
 
 class OrchestratorAgent:
     def __init__(self, db: Session = None):
+        self.analyzer = None
+        self.router = None
+        self.validator = None
+        self.reporter = None
+        
         try:
-            self.analyzer = analyzer.AnalyzerAgent()
-            self.router = fixer.FixerRouter()
-            self.validator = validator.ValidatorAgent()
-            self.reporter = reporter.ReporterAgent()
-        except Exception:
-            self.analyzer = None
+            self.analyzer = analyzer.AnalyzerAgent() if analyzer else None
+            self.router = fixer.FixerRouter() if fixer else None
+            self.validator = validator.ValidatorAgent() if validator else None
+            self.reporter = reporter.ReporterAgent() if reporter else None
+        except Exception as e:
+            logger.warning("Could not initialize agent components: %s", e)
             
         self.db = db
         
@@ -64,12 +75,17 @@ class OrchestratorAgent:
             git_ops.create_branch(repo, state["branch_name"])
             state["ledger"]["repo_path"] = repo_path
         except Exception as e:
+            logger.exception("Git clone failed for run %s: %s", state["run_id"], e)
             state["ledger"]["clone_error"] = str(e)
+            state["ledger"]["clone_failed"] = True
             if self.db:
                 crud.update_run(self.db, run_id=state["run_id"], status="failed", memory={"error": f"Git Pull Failed: {str(e)}"})
         return state
 
     def analyze_node(self, state: AgentState):
+        if state["ledger"].get("clone_failed"):
+            return state
+            
         state["iteration"] += 1
         
         if self.db:
@@ -85,7 +101,10 @@ class OrchestratorAgent:
         return state
         
     def fix_node(self, state: AgentState):
-        if state["failures"] and hasattr(self, "router"):
+        if state["ledger"].get("clone_failed"):
+            return state
+            
+        if state["failures"] and self.router:
             f = state["failures"][0]
             try:
                 AgentClass = self.router.route(f.get("bug_type", "LINTING"))
@@ -103,22 +122,37 @@ class OrchestratorAgent:
                         commit_message=fix_res.get("message", "Applied fix"),
                         status="applied"
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.exception("Fix failed for run %s: %s", state["run_id"], e)
         return state
         
     def validate_node(self, state: AgentState):
+        if state["ledger"].get("clone_failed"):
+            return state
+            
         repo_path = state["ledger"].get("repo_path", "mock_path")
-        if hasattr(self, "validator") and self.validator:
-            self.validator.validate(repo_path, {}, {})
+        validation_passed = False
+        if self.validator:
+            try:
+                self.validator.validate(repo_path, {}, {})
+                validation_passed = True
+            except Exception as e:
+                logger.exception("Validation failed for run %s: %s", state["run_id"], e)
+                validation_passed = False
+        else:
+            # Mock: pass if fixes were applied
+            validation_passed = len(state["fixes_applied"]) > 0
             
         if self.db and state.get("db_iteration_id"):
-            status_val = "pass" if not state["failures"] else "fail"
+            status_val = "pass" if validation_passed else "fail"
             crud.update_iteration(self.db, iteration_id=state["db_iteration_id"], status=status_val, logs="Validation complete")
         return state
         
     def report_node(self, state: AgentState):
-        if hasattr(self, "reporter") and self.reporter:
+        if state["ledger"].get("clone_failed"):
+            return state
+            
+        if self.reporter:
             self.reporter.build_results({"run_id": state["run_id"], "commits": len(state["fixes_applied"])})
             
         if self.db:
