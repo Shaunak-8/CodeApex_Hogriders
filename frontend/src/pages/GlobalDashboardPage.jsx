@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Activity, GitMerge, FileWarning, TrendingUp } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { getProjects } from '../lib/api';
 import CommandCenter from '../components/CommandCenter';
 
 export default function GlobalDashboardPage() {
@@ -11,10 +12,7 @@ export default function GlobalDashboardPage() {
     async function fetchStats() {
       if (!session?.access_token) return;
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/projects`, {
-          headers: { Authorization: `Bearer ${session.access_token}` }
-        });
-        const data = await res.json();
+        const data = await getProjects();
         
         let totalRuns = 0;
         let totalIssues = 0;

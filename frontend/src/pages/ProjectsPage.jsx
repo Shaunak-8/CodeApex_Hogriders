@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { getProjects } from '../lib/api';
 import { useAgentStore } from '../store/agentStore';
 import { FolderGit2, Calendar, GitCommit, AlertTriangle, Plus, Loader } from 'lucide-react';
 
@@ -12,15 +13,13 @@ export default function ProjectsPage() {
   
   const setProjectId = useAgentStore(s => s.setProjectId);
   const setRepoUrl = useAgentStore(s => s.setRepoUrl);
+  const reset = useAgentStore(s => s.reset);
 
   useEffect(() => {
     async function fetchProjects() {
       if (!session?.access_token) return;
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/projects`, {
-          headers: { Authorization: `Bearer ${session.access_token}` }
-        });
-        const data = await res.json();
+        const data = await getProjects();
         setProjects(data.projects || []);
       } catch (e) {
         console.error(e);
@@ -32,6 +31,7 @@ export default function ProjectsPage() {
   }, [session]);
 
   const handleOpenProject = (p) => {
+    reset();
     setProjectId(p.id);
     setRepoUrl(p.repo_url);
     navigate(`/app/project/${p.id}`);

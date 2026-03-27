@@ -1,13 +1,12 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, FolderKanban, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { logout } from '../lib/supabase';
 import UserAvatar from './UserAvatar';
 
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   const handleLogout = async () => {
     await logout();

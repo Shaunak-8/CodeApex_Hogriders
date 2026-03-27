@@ -37,9 +37,9 @@ def create_project(user_id: str, repo_url: str, name: str, tags: list, visibilit
             cur.execute(
                 """
                 INSERT INTO projects (user_id, repo_url, name, tags, visibility) 
-                VALUES (%s, %s, %s, %s, %s) RETURNING *
+                VALUES (%s, %s, %s, %s::json, %s) RETURNING *
                 """,
-                (user_id, repo_url, name, tags, visibility)
+                (user_id, repo_url, name, json.dumps(tags), visibility)
             )
             project = cur.fetchone()
         conn.commit()
@@ -66,13 +66,17 @@ def get_project(project_id: str):
         conn.close()
 
 # --- RUNS ---
-def create_run(project_id: str):
+def create_run(run_id: str, project_id: str, repo_url: str, team_name: str, leader_name: str, branch_name: str = "main"):
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "INSERT INTO runs (project_id, status) VALUES (%s, 'running') RETURNING *",
-                (project_id,)
+                """
+                INSERT INTO runs (id, project_id, repo_url, team_name, leader_name, branch_name, status)
+                VALUES (%s, %s, %s, %s, %s, %s, 'running')
+                RETURNING *
+                """,
+                (run_id, project_id, repo_url, team_name, leader_name, branch_name)
             )
             run = cur.fetchone()
         conn.commit()

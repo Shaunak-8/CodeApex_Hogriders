@@ -26,7 +26,7 @@ def get_runs(db: Session, skip: int = 0, limit: int = 100):
 def get_run(db: Session, run_id: str):
     return db.query(models.Run).filter(models.Run.id == run_id).first()
 
-def update_run(db: Session, run_id: str, status: Optional[str] = None, overall_score: Optional[float] = None, memory: Optional[dict] = None):
+def update_run(db: Session, run_id: str, status: Optional[str] = None, overall_score: Optional[float] = None, memory: Optional[dict] = None, total_failures: Optional[int] = None, total_fixes: Optional[int] = None):
     db_run = get_run(db, run_id)
     if not db_run:
         raise ValueError(f"Run with id '{run_id}' not found")
@@ -36,6 +36,10 @@ def update_run(db: Session, run_id: str, status: Optional[str] = None, overall_s
         db_run.overall_score = overall_score
     if memory is not None:
         db_run.memory = memory
+    if total_failures is not None:
+        db_run.total_failures = total_failures
+    if total_fixes is not None:
+        db_run.total_fixes = total_fixes
     db.commit()
     db.refresh(db_run)
     return db_run

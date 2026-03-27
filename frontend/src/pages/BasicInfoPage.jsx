@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { User, Phone, Briefcase, MapPin, ArrowRight } from 'lucide-react';
+import { registerUser } from '../lib/api';
 
 export default function BasicInfoPage() {
   const navigate = useNavigate();
@@ -27,16 +28,9 @@ export default function BasicInfoPage() {
         });
 
         // Sync with backend Neon DB
-        await fetch(`${import.meta.env.VITE_API_URL}/me`, {
-           method: 'POST',
-           headers: {
-             'Content-Type': 'application/json',
-             Authorization: `Bearer ${session.access_token}`
-           },
-           body: JSON.stringify({
-             email: user.email,
-             profile_data: form
-           })
+        await registerUser({
+          email: user.email,
+          profile_data: form
         });
       }
       navigate('/connect-repo');

@@ -52,10 +52,16 @@ export const useAgentSSE = (runId) => {
               if (result.health_score) setHealthScore(result.health_score);
               if (result.causal_graph) setCausalGraph(result.causal_graph);
               if (result.total_failures !== undefined) setTotals(result.total_failures, result.total_fixes);
+
+              // Respect backend final status (PASSED/FAILED/etc)
+              const finalStatus = (result.status || result.final_status || '').toString().toLowerCase();
+              if (finalStatus.includes('pass')) setStatus('passed');
+              else if (finalStatus.includes('fail')) setStatus('failed');
+              else setStatus('idle');
             } catch {
               // Not JSON — just a status message
+              setStatus('passed');
             }
-            setStatus('passed');
             setEndTime(new Date().toISOString());
             es.close();
             break;

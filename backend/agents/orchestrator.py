@@ -18,7 +18,7 @@ from core.context_builder import ContextBuilder
 
 from api.sse import emit
 from sqlalchemy.orm import Session
-from api.db import crud
+from db import crud
 
 import tools.git_ops as git_ops
 
@@ -48,7 +48,10 @@ class AgentState(TypedDict):
 class OrchestratorAgent:
     def __init__(self, db: Session = None):
         self.db = db
-        self.groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        api_key = os.getenv("GROQ_API_KEY")
+        # Allow the agent to run in "analysis-only" mode when Groq isn't configured.
+        # Fix generation will gracefully no-op in that case.
+        self.groq_client = Groq(api_key=api_key) if api_key else None
         
         self.analyzer = AnalyzerAgent()
         self.router = FixerRouter()
@@ -202,7 +205,8 @@ class OrchestratorAgent:
                         file_path=file_key,
                         bug_type=bug_type,
                         commit_message=fix_res.get("explanation", "Auto fix"),
-                        status="applied"
+                        status="applied",
+                        confidence_score=conf["score"]
                     )
             else:
                 self.ledger.add_attempt(file_key, strategy, "failed")

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useAgentStore } from '../store/agentStore';
 import { Bot, ArrowRight, Loader, Plus, LayoutGrid, CheckCircle2, Circle } from 'lucide-react';
+import { getProjectTasks, workspaceChat, updateTask } from '../lib/api';
 
 export default function WorkspacePage() {
   const { id } = useParams();
@@ -20,10 +21,7 @@ export default function WorkspacePage() {
   const fetchTasks = async () => {
     if (!session?.access_token) return;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/projects/${id}/tasks`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      const data = await res.json();
+      const data = await getProjectTasks(id);
       setTasks(data.tasks || []);
     } catch (e) {
       console.error(e);
@@ -41,15 +39,7 @@ export default function WorkspacePage() {
       setChatting(true);
       setAiSummary('');
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/workspace/chat`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}` 
-          },
-          body: JSON.stringify({ project_id: id, prompt: chatPrompt }),
-        });
-        const data = await res.json();
+        const data = await workspaceChat(id, chatPrompt);
         if (data.summary) {
             setAiSummary(data.summary);
             fetchTasks();
@@ -66,14 +56,7 @@ export default function WorkspacePage() {
   const updateTaskStatus = async (taskId, newStatus) => {
     try {
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
-      await fetch(`${import.meta.env.VITE_API_URL}/tasks/${taskId}`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}` 
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
+      await updateTask(taskId, newStatus);
     } catch (e) {
       console.error(e);
       fetchTasks();

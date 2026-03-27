@@ -8,8 +8,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 
+from db.db import get_db, SessionLocal
 from api.db import (
-    get_db, SessionLocal, ensure_user, create_project, get_projects, 
+    ensure_user, create_project, get_projects, 
     get_project_stats, create_run as db_create_run, update_run_result,
     get_project, create_task, get_tasks, update_task_status,
     create_issue, get_db_connection
@@ -17,11 +18,16 @@ from api.db import (
 from db import crud
 from api.auth import verify_token, get_user_id
 from api.sse import get_queue, emit
+import logging
 from api.models import (
     ProjectCreate, EnsureUserRequest, RunRequest, 
     TaskCreate, TaskUpdate, WorkspaceChatRequest,
     RCARequest, InfraRequest
 )
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
 
 from agents.orchestrator import OrchestratorAgent
 from tools.git_ops import clone_repo
@@ -76,8 +82,11 @@ async def register_user(req: EnsureUserRequest, request: Request):
         user_id = get_user_id(request)
         ensure_user(user_id, req.email, req.profile_data)
         return {"status": "success", "user_id": user_id}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=401, detail=str(e))
+        logger.exception("Failed to register user: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ---------------- GITHUB INTEGRATION ---------------- #
 
@@ -87,7 +96,10 @@ async def fetch_github_repos(request: Request):
         await verify_token(request)
         repos = await get_user_repositories()
         return {"repos": repos}
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.exception("Failed to fetch GitHub repos: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 # ---------------- PROJECT ENDPOINTS ---------------- #
@@ -99,7 +111,10 @@ async def create_new_project(req: ProjectCreate, request: Request):
         user_id = get_user_id(request)
         project = create_project(user_id, req.repo_url, req.name, req.tags, req.visibility)
         return {"project": project}
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.exception("Failed to create project: %s", e)
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/projects")
@@ -113,7 +128,10 @@ async def list_projects(request: Request):
             p['stats'] = get_project_stats(p['id'])
             
         return {"projects": projects}
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.exception("Failed to list projects: %s", e)
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/projects/{project_id}/graph")
@@ -151,8 +169,20 @@ async def run_agent(
     except Exception:
         pass
 
-    db_run = db_create_run(request_body.project_id) if user_id else None
-    run_id = str(db_run['id']) if db_run else str(uuid.uuid4())[:8]
+    # Always pick a run_id first so we can use it consistently for SSE + DB.
+    run_id = str(uuid.uuid4())[:8]
+
+    # Create a DB run whenever we have a project_id (even if auth is missing),
+    # otherwise background iteration logging will violate FK constraints.
+    if request_body.project_id:
+        db_create_run(
+            run_id=run_id,
+            project_id=request_body.project_id,
+            repo_url=request_body.repo_url,
+            team_name=request_body.team_name,
+            leader_name=request_body.leader_name,
+            branch_name=request_body.branch_name,
+        )
 
     # Initialize SSE Queue
     get_queue(run_id)

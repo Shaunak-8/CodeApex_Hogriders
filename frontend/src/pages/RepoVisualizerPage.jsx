@@ -6,6 +6,8 @@ import ReactFlow, { Background, Controls } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Network, ArrowLeft, Loader } from 'lucide-react';
 
+import { getRepoGraph } from '../lib/api';
+
 export default function RepoVisualizerPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -19,10 +21,7 @@ export default function RepoVisualizerPage() {
     async function fetchGraph() {
       if (!session?.access_token) return;
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/projects/${id}/graph`, {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        const data = await res.json();
+        const data = await getRepoGraph(id);
         setGraphData({ nodes: data.nodes || [], edges: data.edges || [] });
       } catch (e) {
         console.error("Failed to fetch graph:", e);

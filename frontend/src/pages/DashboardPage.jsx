@@ -15,6 +15,7 @@ import RepoHealthScore from '../components/RepoHealthScore';
 import CausalityGraph from '../components/CausalityGraph';
 import StatusBadge from '../components/StatusBadge';
 import { Activity, Brain, Loader, X } from 'lucide-react';
+import { getRootCauseAnalysis } from '../lib/api';
 
 export default function DashboardPage() {
   const { id } = useParams();
@@ -23,6 +24,9 @@ export default function DashboardPage() {
   
   const status = useAgentStore(s => s.status);
   const runId = useAgentStore(s => s.runId);
+  const setStatus = useAgentStore(s => s.setStatus);
+  const projectId = useAgentStore(s => s.projectId);
+  const setProjectId = useAgentStore(s => s.setProjectId);
   const repoUrl = useAgentStore(s => s.repoUrl);
   const thoughts = useAgentStore(s => s.thoughts);
   const fixes = useAgentStore(s => s.fixes);
@@ -38,20 +42,23 @@ export default function DashboardPage() {
   const { startRun } = useAgentRun();
   useAgentSSE(runId);
 
+  // Ensure the store knows which project we're on (important if user deep-links / refreshes)
+  useEffect(() => {
+    if (id && projectId !== id) setProjectId(id);
+  }, [id, projectId, setProjectId]);
+
+  // If user navigates back to the dashboard with no active run,
+  // don't keep showing a stale FAILED badge from a previous session.
+  useEffect(() => {
+    if (!runId) setStatus('idle');
+  }, [id, runId, setStatus]);
+
   const handleRCA = async () => {
     if (!thoughts.length) return;
     setRcaLoading(true);
     try {
       const errorLogs = thoughts.filter(t => t.type === 'error').map(t => t.message).join('\n');
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/workspace/rca`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}` 
-        },
-        body: JSON.stringify({ error_log: errorLogs || "Manual Analysis Requested" }),
-      });
-      const data = await res.json();
+      const data = await getRootCauseAnalysis(errorLogs || "Manual Analysis Requested");
       setRcaData(data);
     } catch (e) {
       console.error(e);

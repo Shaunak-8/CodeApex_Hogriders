@@ -35,3 +35,10 @@ class RCARequest(BaseModel):
 
 class InfraRequest(BaseModel):
     project_id: str
+
+class RunRequest(BaseModel):
+    repo_url: str
+    team_name: str
+    leader_name: str
+    branch_name: Optional[str] = "main"
+    project_id: Optional[str] = None

@@ -23,6 +23,9 @@ class BaseFixerAgent:
         self.context_builder = context_builder
 
     def fix(self, failure: dict, repo_path: str, history: list = None) -> dict:
+        if not self.groq_client:
+            # Groq not configured; run without auto-fix capability.
+            return {}
         # Build context
         file_path = os.path.join(repo_path, failure["file"])
         context = self.context_builder.build(failure["file"], repo_path)

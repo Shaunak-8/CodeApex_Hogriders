@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAgentStore } from '../store/agentStore';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
-import { GitBranch, Search, ArrowRight, Check, Loader } from 'lucide-react';
+import { GitBranch, Search, ArrowRight, Check, Loader, Tag, X } from 'lucide-react';
+import { getRepos, createProject, registerUser } from '../lib/api';
 
 export default function ConnectRepoPage() {
   const navigate = useNavigate();
@@ -18,6 +19,8 @@ export default function ConnectRepoPage() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState(null);
+  const [tags, setTags] = useState([]);
+  const [tagInput, setTagInput] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -28,14 +31,7 @@ export default function ConnectRepoPage() {
       }
       if (isMounted) setLoading(true);
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/repos`, {
-          headers: { Authorization: `Bearer ${session.access_token}` }
-        });
-        if (!res.ok) {
-           const errData = await res.json().catch(() => ({}));
-           throw new Error(errData.detail || 'Failed to fetch from GitHub');
-        }
-        const data = await res.json();
+        const data = await getRepos();
         if (isMounted) setRepos(data.repos || []);
       } catch (e) {
         if (isMounted) setError(e.message);
@@ -54,28 +50,21 @@ export default function ConnectRepoPage() {
     setConnecting(true);
     setError(null);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/projects`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          repo_url: repoUrl,
-          name: repoName || repoUrl.split('/').pop(),
-          tags: ['imported'],
-          visibility: 'private'
-        })
-      });
+      // Ensure the user row exists in our DB before creating a project
+      await registerUser({ email: session.user?.email || '', profile_data: {} });
       
-      if (!res.ok) throw new Error('Failed to create project');
-      const data = await res.json();
+      const data = await createProject({
+        repo_url: repoUrl,
+        name: repoName || repoUrl.split('/').pop().replace('.git', ''),
+        tags: tags.length > 0 ? tags : ['imported'],
+        visibility: 'private'
+      });
       
       setRepoUrl(repoUrl);
       setProjectId(data.project.id);
       setConnected(true);
     } catch (e) {
-      setError(e.message);
+      setError(e.response?.data?.detail || e.message);
     } finally {
       setConnecting(false);
     }
@@ -102,6 +91,7 @@ export default function ConnectRepoPage() {
             style={styles.urlInput}
             placeholder="https://github.com/username/repo"
             value={url}
+            maxLength={500}
             onChange={e => { setUrl(e.target.value); setConnected(false); }}
           />
           <button 
@@ -111,6 +101,44 @@ export default function ConnectRepoPage() {
           >
             {connecting ? <Loader size={14} className="spin" /> : connected ? <><Check size={14} /> Connected</> : 'Connect'}
           </button>
+        </div>
+
+        {/* Tag Input */}
+        <div style={styles.tagSection}>
+          <div style={styles.urlBox}>
+            <Tag size={14} color="#00ccff" />
+            <input
+              style={styles.urlInput}
+              placeholder="Add a tag and press Enter..."
+              value={tagInput}
+              onChange={e => setTagInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && tagInput.trim()) {
+                  e.preventDefault();
+                  if (!tags.includes(tagInput.trim())) setTags(prev => [...prev, tagInput.trim()]);
+                  setTagInput('');
+                }
+              }}
+            />
+            <button
+              style={styles.connectBtn}
+              onClick={() => {
+                if (tagInput.trim() && !tags.includes(tagInput.trim())) {
+                  setTags(prev => [...prev, tagInput.trim()]);
+                  setTagInput('');
+                }
+              }}
+            >+</button>
+          </div>
+          {tags.length > 0 && (
+            <div style={styles.tagList}>
+              {tags.map((t, i) => (
+                <span key={i} style={styles.tagChip}>
+                  {t} <X size={10} style={{cursor:'pointer'}} onClick={() => setTags(prev => prev.filter((_, j) => j !== i))} />
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {error && <p style={styles.error}>{error}</p>}
@@ -180,4 +208,8 @@ const styles = {
   loadingInfo: { color: '#555', fontSize: 11, padding: 16, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
 
   nextBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', background: 'linear-gradient(135deg, #00ff88, #00cc6a)', color: '#000', border: 'none', borderRadius: 10, fontWeight: 800, cursor: 'pointer', fontSize: 13 },
+
+  tagSection: { marginBottom: 16 },
+  tagList: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: -12, marginBottom: 16 },
+  tagChip: { display: 'inline-flex', alignItems: 'center', gap: 4, background: '#00ccff18', color: '#00ccff', border: '1px solid #00ccff33', borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 600 },
 };

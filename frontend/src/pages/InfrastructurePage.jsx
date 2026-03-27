@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Server, FileCode, Terminal, Download, Loader, CheckCircle2 } from 'lucide-react';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
+import { generateInfra } from '../lib/api';
 
 export default function InfrastructurePage() {
   const { id } = useParams();
@@ -13,18 +14,10 @@ export default function InfrastructurePage() {
   const [infra, setInfra] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const generateInfra = async () => {
+  const generateInfraAction = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/workspace/infra`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}` 
-        },
-        body: JSON.stringify({ project_id: id }),
-      });
-      const data = await res.json();
+      const data = await generateInfra(id);
       setInfra(data);
     } catch (e) {
       console.error(e);
@@ -58,7 +51,7 @@ export default function InfrastructurePage() {
             <p style={{color: '#888', maxWidth: 400, textAlign: 'center', marginBottom: 24}}>
                 Generate optimized Dockerfiles and CI/CD pipelines specifically tailored for this project's architecture.
             </p>
-            <button style={styles.generateBtn} onClick={generateInfra}>
+            <button style={styles.generateBtn} onClick={generateInfraAction}>
                 Generate Configurations
             </button>
         </div>
