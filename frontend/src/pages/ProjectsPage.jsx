@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { getProjects } from '../lib/api';
 import { useAgentStore } from '../store/agentStore';
@@ -59,7 +59,18 @@ export default function ProjectsPage() {
       ) : (
         <div style={styles.grid}>
           {projects.map(p => (
-            <div key={p.id} style={styles.card} onClick={() => handleOpenProject(p)}>
+            <Link 
+              key={p.id} 
+              to={`/app/project/${p.id}`}
+              style={styles.card} 
+              className="project-card"
+              aria-label={`Open project ${p.name}`}
+              onClick={() => {
+                reset();
+                setProjectId(p.id);
+                setRepoUrl(p.repo_url);
+              }}
+            >
               <div style={styles.cardTop}>
                 <FolderGit2 size={24} color="#00ccff" />
                 <span style={styles.visibility}>{p.visibility}</span>
@@ -83,13 +94,15 @@ export default function ProjectsPage() {
                   <span style={{ fontSize: 10 }}>{new Date(p.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}
       <style>{`
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
+        .project-card { text-decoration: none; color: inherit; display: block; transition: border-color 0.2s; }
+        .project-card:hover { border-color: #00ff88 !important; }
       `}</style>
     </div>
   );
@@ -106,7 +119,7 @@ const styles = {
   empty: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 80, color: '#555', gap: 16, border: '1px dashed #1e1e2e', borderRadius: 12 },
   
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 24 },
-  card: { background: '#0a0a0f', border: '1px solid #1e1e2e', borderRadius: 12, padding: 20, cursor: 'pointer', transition: 'border-color 0.2s', ':hover': { borderColor: '#00ff88' } },
+  card: { background: '#0a0a0f', border: '1px solid #1e1e2e', borderRadius: 12, padding: 20, cursor: 'pointer' },
   cardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   visibility: { fontSize: 9, textTransform: 'uppercase', letterSpacing: 1, color: '#888', background: '#111118', padding: '4px 8px', borderRadius: 12 },
   name: { fontSize: 16, fontWeight: 700, marginBottom: 4 },
