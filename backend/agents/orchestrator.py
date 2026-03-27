@@ -78,22 +78,9 @@ if parent_dir not in sys.path:
 from agents.analyzer import parse_failure
 from agents.fixer import generate_fix
 
-# Stubs/imports for unwritten components to ensure functionality
-try:
-    from agents.validator import validate_fix
-except ImportError:
-    def validate_fix(fix: str, failure) -> bool: return False
-
-try:
-    from agents.reporter import report_result
-except ImportError:
-    def report_result(attempt: int, success: bool, fix: str):
-        print(f"Report -> Attempt {attempt} | Success: {success}")
-
-try:
-    from core.context_builder import build_context
-except ImportError:
-    def build_context(failure) -> str: return "Stub context"
+from agents.validator import validate_fix
+from agents.reporter import report_result
+from core.context_builder import build_context
 
 
 def run_orchestrator(raw_failure_output: str):

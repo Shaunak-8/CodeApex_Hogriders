@@ -90,3 +90,7 @@ class ContextBuilder:
             "test_file": test_file,
             "token_count": token_count,
         }
+
+def build_context(failure) -> str:
+    builder = ContextBuilder()
+    return str(builder.build(failure.file, "."))
