@@ -36,16 +36,8 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api")
 app.include_router(sse_router)
 
-<<<<<<< HEAD
-=======
-# ✅ DB TABLE CREATION (CRITICAL)
-@app.on_event("startup")
-def startup():
-    print("🔥 Creating tables in Neon...")
-    Base.metadata.create_all(bind=engine)
 
 # Health check
->>>>>>> c50198c6af1b48dfcfbbdad9edfd4f5b1265b7fc
 @app.get("/health")
 def health_check():
     return {"status": "ok", "max_retries": MAX_RETRIES}
