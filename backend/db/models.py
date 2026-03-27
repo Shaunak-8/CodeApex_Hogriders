@@ -52,7 +52,6 @@ class Run(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     memory = Column(JSON, nullable=True)
-    results_json = Column(JSON, nullable=True) # Added for raw SQL compatibility
 
     # Relationships
     project = relationship("Project", back_populates="runs")

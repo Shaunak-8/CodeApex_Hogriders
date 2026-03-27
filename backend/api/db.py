@@ -13,6 +13,42 @@ def get_db_connection():
         raise ValueError("DATABASE_URL not set in .env")
     return psycopg2.connect(db_url)
 
+
+def _resolve_pg_enum_value(conn, enum_type_name: str, desired_value: str, fallback_value: str | None = None) -> str:
+    """
+    Resolve a PostgreSQL enum label in a case-insensitive way.
+    This protects us from environments where enum labels were created
+    as uppercase/lowercase variants across different migrations.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT e.enumlabel
+            FROM pg_enum e
+            JOIN pg_type t ON t.oid = e.enumtypid
+            WHERE t.typname = %s
+            ORDER BY e.enumsortorder
+            """,
+            (enum_type_name,),
+        )
+        labels = [row[0] for row in cur.fetchall()]
+
+    if not labels:
+        return fallback_value or desired_value
+
+    desired_lower = desired_value.lower()
+    for label in labels:
+        if label.lower() == desired_lower:
+            return label
+
+    if fallback_value:
+        fallback_lower = fallback_value.lower()
+        for label in labels:
+            if label.lower() == fallback_lower:
+                return label
+
+    return labels[0]
+
 # --- USERS ---
 def ensure_user(user_id: str, email: str, profile_data: dict = None):
     conn = get_db_connection()
@@ -72,14 +108,15 @@ def get_project(project_id: str):
 def create_run(run_id: str, project_id: str, repo_url: str, team_name: str, leader_name: str, branch_name: str = "main"):
     conn = get_db_connection()
     try:
+        run_status = _resolve_pg_enum_value(conn, "runstatusenum", "running", "pending")
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
                 INSERT INTO runs (id, project_id, repo_url, team_name, leader_name, branch_name, status)
-                VALUES (%s, %s, %s, %s, %s, %s, 'running')
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING *
                 """,
-                (run_id, project_id, repo_url, team_name, leader_name, branch_name)
+                (run_id, project_id, repo_url, team_name, leader_name, branch_name, run_status)
             )
             run = cur.fetchone()
         conn.commit()
@@ -90,11 +127,20 @@ def create_run(run_id: str, project_id: str, repo_url: str, team_name: str, lead
 def update_run_result(run_id: str, status: str, result_json: dict):
     conn = get_db_connection()
     try:
+        status_val = status.value if hasattr(status, 'value') else status
+        db_status = _resolve_pg_enum_value(conn, "runstatusenum", str(status_val), "completed")
         with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE runs SET status = %s, results_json = %s WHERE id = %s",
-                (status, json.dumps(result_json), run_id)
-            )
+            try:
+                cur.execute(
+                    "UPDATE runs SET status = %s, results_json = %s WHERE id = %s",
+                    (db_status, json.dumps(result_json), run_id)
+                )
+            except Exception:
+                # Backward compatibility for schemas that do not have results_json
+                cur.execute(
+                    "UPDATE runs SET status = %s WHERE id = %s",
+                    (db_status, run_id)
+                )
         conn.commit()
     finally:
         conn.close()

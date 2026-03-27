@@ -114,7 +114,7 @@ async def create_new_project(req: ProjectCreate, request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Failed to create project: %s", e)
+        logger.error("Project creation failed: %s", str(e), exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/projects")

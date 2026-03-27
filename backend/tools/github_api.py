@@ -8,19 +8,19 @@ async def get_user_repositories():
     token = os.getenv("GITHUB_TOKEN")
     
     if not token:
-        raise ValueError("GITHUB_TOKEN is not configured in .env")
+        return []
         
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json"
     }
     
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=20.0) as client:
         # Fetching user's own repos and repos they collaborate on
         response = await client.get("https://api.github.com/user/repos?per_page=100&sort=updated", headers=headers)
         
         if response.status_code != 200:
-            raise Exception(f"GitHub API Error: {response.text}")
+            return []
             
         repos = response.json()
         

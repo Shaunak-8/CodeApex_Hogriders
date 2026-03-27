@@ -1,4 +1,5 @@
 import os
+import re
 from groq import Groq
 import google.generativeai as genai
 import config
@@ -81,10 +82,13 @@ Return ONLY the complete fixed file content. No markdown, no explanations."""
                 fixed_code = response.choices[0].message.content.strip()
 
             
-            # Strip markdown fences if present
-            if fixed_code.startswith("```"):
-                lines = fixed_code.split("\n")
-                fixed_code = "\n".join(lines[1:-1]) if lines[-1].strip() == "```" else "\n".join(lines[1:])
+            # Robust code extraction using regex
+            code_match = re.search(r"```(?:\w+)?\n(.*?)\n```", fixed_code, re.DOTALL)
+            if code_match:
+                fixed_code = code_match.group(1).strip()
+            else:
+                # Fallback: strip any remaining backticks if no full block found
+                fixed_code = fixed_code.replace("```", "").strip()
 
             return {
                 "fixed_code": fixed_code,

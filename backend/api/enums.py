@@ -16,6 +16,11 @@ class RunStatusEnum(str, Enum):
     completed = "completed"
     failed = "failed"
     passed = "passed"
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    PASSED = "passed"
 
 class IterationStatusEnum(str, Enum):
     running = "running"
@@ -23,9 +28,18 @@ class IterationStatusEnum(str, Enum):
     pass_ = "pass"
     fail = "fail"
     passed = "passed"
+    RUNNING = "running"
+    TESTING = "testing"
+    PASS = "pass"
+    FAIL = "fail"
+    PASSED = "passed"
 
 class FixStatusEnum(str, Enum):
     applied = "applied"
     pass_ = "pass"
     fail = "fail"
     reverted = "reverted"
+    APPLIED = "applied"
+    PASS = "pass"
+    FAIL = "fail"
+    REVERTED = "reverted"

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import HeroPage from './pages/HeroPage';
 import AuthPage from './pages/AuthPage';
@@ -12,8 +13,15 @@ import ProjectsPage from './pages/ProjectsPage';
 import WorkspacePage from './pages/WorkspacePage';
 import RepoVisualizerPage from './pages/RepoVisualizerPage';
 import InfrastructurePage from './pages/InfrastructurePage';
+import { useAuth } from './hooks/useAuth';
 
 function App() {
+  const initialize = useAuth((s) => s.initialize);
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
   return (
     <BrowserRouter>
       <Routes>
