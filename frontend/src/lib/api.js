@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getAccessToken } from './supabase';
+import { getAccessToken, getGitHubToken } from './supabase';
 
 const baseUrl = import.meta.env.VITE_API_URL || '';
 
@@ -13,6 +13,10 @@ api.interceptors.request.use(async (config) => {
   const token = await getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  const ghToken = await getGitHubToken();
+  if (ghToken) {
+    config.headers['X-GitHub-Token'] = ghToken;
   }
   return config;
 });
@@ -67,8 +71,8 @@ export const updateTask = async (taskId, status) => {
     return response.data;
 };
 
-export const getRootCauseAnalysis = async (errorLog) => {
-    const response = await api.post('/workspace/rca', { error_log: errorLog });
+export const getRootCauseAnalysis = async (projectId, errorLog) => {
+    const response = await api.post('/workspace/rca', { project_id: projectId, error_log: errorLog });
     return response.data;
 };
 

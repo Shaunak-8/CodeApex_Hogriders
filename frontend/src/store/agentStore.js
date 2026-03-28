@@ -37,6 +37,7 @@ export const useAgentStore = create((set) => ({
   setTotals: (failures, fixes) => set({ totalFailures: failures, totalFixes: fixes }),
   reset: () => set({
     runId: null,
+    repoUrl: "",
     status: "idle",
     thoughts: [],
     fixes: [],

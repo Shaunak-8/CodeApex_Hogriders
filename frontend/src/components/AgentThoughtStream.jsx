@@ -22,18 +22,34 @@ export default function AgentThoughtStream({ thoughts }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [thoughts]);
 
+  const renderMessage = (msg) => {
+    if (typeof msg !== 'string') return JSON.stringify(msg);
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = msg.split(urlRegex);
+    return parts.map((part, i) => 
+      urlRegex.test(part) ? (
+        <a key={i} href={part} target="_blank" rel="noopener noreferrer" style={styles.link}>
+          {part}
+        </a>
+      ) : part
+    );
+  };
+
   return (
     <div style={styles.card}>
       <h3 style={styles.title}><Terminal size={14} color="#00ff88" /> AGENT THOUGHT STREAM</h3>
       <div style={styles.terminal}>
         {thoughts.length === 0 && <p style={styles.muted}>Waiting for agent activity...</p>}
-        {thoughts.map((t, i) => (
-          <div key={i} style={styles.line}>
-            <span style={{ ...styles.agent, color: agentColors[t.agent] || '#555' }}>[{t.agent}]</span>
-            <span style={styles.msg}>{t.message}</span>
-            <span style={styles.time}>{t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : ''}</span>
-          </div>
-        ))}
+        {thoughts.map((t, i) => {
+          const isSuccess = t.message?.includes('SUCCESS') || t.type === 'COMMIT_DONE';
+          return (
+            <div key={i} style={{...styles.line, background: isSuccess ? '#00ff880a' : 'transparent', borderRadius: 4, padding: '2px 4px'}}>
+              <span style={{ ...styles.agent, color: agentColors[t.agent] || '#555' }}>[{t.agent}]</span>
+              <span style={{...styles.msg, color: isSuccess ? '#00ff88' : '#aaa'}}>{renderMessage(t.message)}</span>
+              <span style={styles.time}>{t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : ''}</span>
+            </div>
+          );
+        })}
         <div ref={bottomRef} />
       </div>
     </div>
@@ -48,5 +64,6 @@ const styles = {
   line: { display: 'flex', gap: 8, marginBottom: 6, fontSize: 11, lineHeight: 1.6 },
   agent: { fontWeight: 700, whiteSpace: 'nowrap', fontSize: 10 },
   msg: { color: '#aaa', flex: 1 },
+  link: { color: '#00ccff', textDecoration: 'underline', cursor: 'pointer' },
   time: { color: '#333', fontSize: 9, whiteSpace: 'nowrap' },
 };

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useAgentStore } from '../store/agentStore';
 import { Bot, ArrowRight, Loader, Plus, LayoutGrid, CheckCircle2, Circle } from 'lucide-react';
-import { getProjectTasks, workspaceChat, updateTask } from '../lib/api';
+import { getProjectTasks, workspaceChat, updateTask, getProjects } from '../lib/api';
 
 export default function WorkspacePage() {
   const { id } = useParams();
@@ -30,9 +30,34 @@ export default function WorkspacePage() {
     }
   };
 
+  // Sync project details on load or ID change
   useEffect(() => {
-    fetchTasks();
+    async function syncProject() {
+      if (!id || !session?.access_token) return;
+      
+      const state = useAgentStore.getState();
+      
+      // If project changed, do a full reset
+      if (state.projectId !== id) {
+        state.reset();
+        state.setProjectId(id);
+      }
+      
+      // Fetch repoUrl if missing
+      if (!state.repoUrl || state.projectId !== id) {
+        try {
+          const data = await getProjects();
+          const p = data.projects?.find(proj => proj.id === id);
+          if (p) state.setRepoUrl(p.repo_url);
+        } catch (e) {
+          console.error("Failed to sync project:", e);
+        }
+      }
+      fetchTasks();
+    }
+    syncProject();
   }, [id, session]);
+/* Removed stale deps: projectId, setProjectId, reset */
 
   const sendChat = async () => {
     if (!chatPrompt.trim() || chatting) return;

@@ -15,7 +15,7 @@ import RepoHealthScore from '../components/RepoHealthScore';
 import CausalityGraph from '../components/CausalityGraph';
 import StatusBadge from '../components/StatusBadge';
 import { Activity, Brain, Loader, X } from 'lucide-react';
-import { getRootCauseAnalysis } from '../lib/api';
+import { getRootCauseAnalysis, getProjects } from '../lib/api';
 
 export default function DashboardPage() {
   const { id } = useParams();
@@ -42,10 +42,33 @@ export default function DashboardPage() {
   const { startRun } = useAgentRun();
   useAgentSSE(runId);
 
-  // Ensure the store knows which project we're on (important if user deep-links / refreshes)
+  // Sync project details on load or ID change
   useEffect(() => {
-    if (id && projectId !== id) setProjectId(id);
-  }, [id, projectId, setProjectId]);
+    async function syncProject() {
+      if (!id || !session?.access_token) return;
+      
+      // Use getState to avoid re-triggering the effect on every store change
+      const state = useAgentStore.getState();
+      
+      // If project changed, do a full reset
+      if (state.projectId !== id) {
+        state.reset();
+        state.setProjectId(id);
+      }
+      
+      // If we don't have a URL, fetch it
+      if (!state.repoUrl || state.projectId !== id) {
+        try {
+          const data = await getProjects();
+          const p = data.projects?.find(proj => proj.id === id);
+          if (p) state.setRepoUrl(p.repo_url);
+        } catch (e) {
+          console.error("Failed to sync project:", e);
+        }
+      }
+    }
+    syncProject();
+  }, [id, session]);
 
   // If user navigates back to the dashboard with no active run,
   // don't keep showing a stale FAILED badge from a previous session.
@@ -58,7 +81,7 @@ export default function DashboardPage() {
     setRcaLoading(true);
     try {
       const errorLogs = thoughts.filter(t => t.type === 'error').map(t => t.message).join('\n');
-      const data = await getRootCauseAnalysis(errorLogs || "Manual Analysis Requested");
+      const data = await getRootCauseAnalysis(id, errorLogs || "Manual Analysis Requested");
       setRcaData(data);
     } catch (e) {
       console.error(e);

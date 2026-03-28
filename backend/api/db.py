@@ -136,12 +136,23 @@ def update_run_result(run_id: str, status: str, result_json: dict):
                     (db_status, json.dumps(result_json), run_id)
                 )
             except Exception:
-                # Backward compatibility for schemas that do not have results_json
-                cur.execute(
-                    "UPDATE runs SET status = %s WHERE id = %s",
-                    (db_status, run_id)
-                )
+                # Backward compatibility: Rollback failed transaction before trying fallback
+                conn.rollback()
+                with conn.cursor() as cur2:
+                    cur2.execute(
+                        "UPDATE runs SET status = %s WHERE id = %s",
+                        (db_status, run_id)
+                    )
         conn.commit()
+    finally:
+        conn.close()
+
+def get_latest_run(project_id: str):
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM runs WHERE project_id = %s ORDER BY created_at DESC LIMIT 1", (project_id,))
+            return cur.fetchone()
     finally:
         conn.close()
 
