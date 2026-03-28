@@ -8,7 +8,10 @@ from agents.schema import FailureRecord
 
 class FixerRouter:
     @staticmethod
-    def route(bug_type: str):
+    def route(bug_type: str, file_path: str = ""):
+        if file_path.endswith((".cpp", ".cc", ".h", ".hpp", ".c")):
+            return CPPFixerAgent
+            
         mapping = {
             "LINTING": PythonFixerAgent,
             "TYPE_ERROR": TypeFixerAgent,
@@ -125,6 +128,9 @@ class ImportFixerAgent(BaseFixerAgent):
 
 class JSFixerAgent(BaseFixerAgent):
     specialty = "JavaScript"
+
+class CPPFixerAgent(BaseFixerAgent):
+    specialty = "C++"
 
 # --- Standalone generate_fix for CLI orchestrator ---
 

@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Server, FileCode, Terminal, Download, Loader, CheckCircle2 } from 'lucide-react';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
-import { generateInfra } from '../lib/api';
+import { generateInfra, getProjects } from '../lib/api';
 
 export default function InfrastructurePage() {
   const { id } = useParams();
@@ -14,8 +14,35 @@ export default function InfrastructurePage() {
   const [infra, setInfra] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Sync project details on load or ID change
+  useEffect(() => {
+    async function syncProject() {
+      if (!id || !session?.access_token) return;
+      
+      const state = useAgentStore(s => s.getState ? s.getState() : useAgentStore.getState());
+      
+      if (state.projectId !== id) {
+        state.reset();
+        state.setProjectId(id);
+        setInfra(null);
+      }
+
+      if (!state.repoUrl || state.projectId !== id) {
+        try {
+          const data = await getProjects();
+          const p = data.projects?.find(proj => proj.id === id);
+          if (p) state.setRepoUrl(p.repo_url);
+        } catch (e) {
+          console.error("Failed to sync project:", e);
+        }
+      }
+    }
+    syncProject();
+  }, [id, session]);
+
   const generateInfraAction = async () => {
     setLoading(true);
+    setInfra(null);
     try {
       const data = await generateInfra(id);
       setInfra(data);
