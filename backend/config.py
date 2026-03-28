@@ -1,12 +1,22 @@
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables from .env file with FORCE OVERRIDE
+# This ensures shell-level stale tokens don't leak into the app
 load_dotenv(override=True)
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
-E2B_API_KEY = os.getenv("E2B_API_KEY", "")
+# Explicitly re-read from .env for critical tokens
+import dotenv
+env_values = dotenv.dotenv_values(".env")
+
+GROQ_API_KEY = env_values.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY", "")
+GITHUB_TOKEN = env_values.get("GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN", "")
+E2B_API_KEY = env_values.get("E2B_API_KEY") or os.getenv("E2B_API_KEY", "")
+
+# Ensure the system-level environ is also updated for subprocesses
+if env_values.get("GITHUB_TOKEN"):
+    os.environ["GITHUB_TOKEN"] = env_values.get("GITHUB_TOKEN")
+
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", "5"))
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 

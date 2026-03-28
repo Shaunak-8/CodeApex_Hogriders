@@ -143,7 +143,7 @@ const styles = {
     opacity: 0.3,
   },
   muted: {
-    fontSize: 9,
+    fontSize: 12,
     letterSpacing: 2,
     fontWeight: 800,
     color: 'var(--text-secondary)',
@@ -152,7 +152,7 @@ const styles = {
     display: 'flex',
     gap: 16,
     marginBottom: 10,
-    fontSize: 11,
+    fontSize: 18,
     lineHeight: 1.5,
     position: 'relative',
     zIndex: 2,
@@ -164,7 +164,7 @@ const styles = {
   time: {
     color: 'var(--text-secondary)',
     opacity: 0.4,
-    fontSize: 9,
+    fontSize: 13,
   },
   content: {
     display: 'flex',
@@ -174,7 +174,7 @@ const styles = {
   agent: {
     fontWeight: 900,
     whiteSpace: 'nowrap',
-    fontSize: 9,
+    fontSize: 13,
     letterSpacing: 1,
   },
   msg: {
