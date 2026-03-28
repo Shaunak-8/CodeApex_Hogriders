@@ -1,3 +1,4 @@
+import React, { useEffect, useRef } from 'react';
 import { GitBranch, CheckCircle, AlertCircle, Shield, Zap, Terminal } from 'lucide-react';
 
 const iconMap = {
@@ -6,15 +7,28 @@ const iconMap = {
   FAILURE_DETECTED: { icon: <AlertCircle size={13} />, color: '#ff3b3b' },
   FIX_ROUTED: { icon: <Zap size={13} />, color: '#ffaa00' },
   FIX_APPLIED: { icon: <CheckCircle size={13} />, color: '#00ff88' },
+  VALIDATION_STARTED: { icon: <Shield size={13} />, color: '#a855f7' },
+  VALIDATION_DONE: { icon: <CheckCircle size={13} />, color: '#00ff88' },
   VALIDATION_RESULT: { icon: <Shield size={13} />, color: '#a855f7' },
+  COMMIT_STARTED: { icon: <GitBranch size={13} />, color: '#00ccff' },
+  COMMIT_DONE: { icon: <CheckCircle size={13} />, color: '#00ff88' },
+  COMMIT_FAILED: { icon: <AlertCircle size={13} />, color: '#ff3b3b' },
   RUN_COMPLETED: { icon: <CheckCircle size={13} />, color: '#00ff88' },
 };
 
 export default function CICDTimeline({ thoughts }) {
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [thoughts]);
+
   return (
     <div style={styles.card}>
       <h3 style={styles.title}>ORCHESTRATION_TIMELINE</h3>
-      <div style={styles.list}>
+      <div style={styles.list} ref={scrollRef}>
         {thoughts.length === 0 && <p style={styles.muted}>WAITING_FOR_TELEMETRY...</p>}
         {thoughts.map((t, i) => {
           const meta = iconMap[t.type] || { icon: <div style={styles.defaultDot}></div>, color: '#333' };
@@ -40,7 +54,7 @@ export default function CICDTimeline({ thoughts }) {
 const styles = {
   card: { background: '#111118', border: '1px solid #1e1e2e', borderRadius: 16, padding: 20 },
   title: { fontSize: 10, color: 'var(--text-secondary)', letterSpacing: 2, marginBottom: 16, fontFamily: "var(--font-mono)", fontWeight: 800 },
-  list: { display: 'flex', flexDirection: 'column' },
+  list: { display: 'flex', flexDirection: 'column', maxHeight: 400, overflowY: 'auto' },
   muted: { color: 'rgba(255, 255, 255, 0.6) !important', fontSize: 10, textAlign: 'center', padding: '20px 0', fontFamily: "var(--font-mono)", letterSpacing: 1 },
   item: { display: 'flex', gap: 14, position: 'relative', paddingBottom: 4 },
   iconWrap: { width: 28, height: 28, borderRadius: '50%', background: '#0a0a0f', border: '1px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2, flexShrink: 0 },

@@ -13,11 +13,13 @@ from api.db import (
     ensure_user, create_project, get_projects, 
     get_project_stats, create_run as db_create_run, update_run_result,
     get_project, create_task, get_tasks, update_task_status,
-    create_issue, get_db_connection, get_heatmap_stats
+    create_issue, get_db_connection, get_heatmap_stats, get_latest_run
 )
 from db import crud
 from api.auth import verify_token, get_user_id
 from api.sse import get_queue, emit
+from agents.orchestrator import OrchestratorAgent
+import tools.git_ops as git_ops
 import logging
 from api.models import (
     ProjectCreate, EnsureUserRequest, RunRequest, 
@@ -32,6 +34,7 @@ router = APIRouter()
 from agents.orchestrator import OrchestratorAgent
 from tools.git_ops import clone_repo
 from tools.github_api import get_user_repositories
+from core.project_analyzer import ProjectAnalyzer
 from psycopg2.extras import RealDictCursor
 
 logger = logging.getLogger(__name__)
@@ -42,14 +45,15 @@ RUN_ID_PATTERN = re.compile(r"^[a-f0-9\-]{1,36}$")
 
 # ---------------- BACKGROUND AGENT ---------------- #
 
-def background_agent_run(run_id: str, repo_url: str, team_name: str, leader_name: str, branch_name: str, project_id: str = None):
-    print(f"🔥 BACKGROUND TASK STARTED for run_id={run_id}")
+def background_agent_run(run_id: str, repo_url: str, team_name: str, leader_name: str, branch_name: str, project_id: str = None, token: str = None):
+    token_status = "present" if token else "missing"
+    print(f"🔥 BACKGROUND TASK STARTED for run_id={run_id} | Token: {token_status}")
     
     db = SessionLocal()
     try:
         repo_path = os.path.join(os.getcwd(), "workspaces", f"run_{run_id}")
         emit(run_id, "GitAgent", f"Cloning repository {repo_url}...", "RUN_STARTED")
-        clone_repo(repo_url, repo_path)
+        git_ops.clone_repo(repo_url, repo_path, token=token)
         
         orch = OrchestratorAgent(db=db)
         result = orch.run(
@@ -57,7 +61,8 @@ def background_agent_run(run_id: str, repo_url: str, team_name: str, leader_name
             repo_url=repo_url,
             repo_path=repo_path,
             team_name=team_name,
-            leader_name=leader_name
+            leader_name=leader_name,
+            token=token
         )
         
         if project_id:
@@ -156,19 +161,33 @@ async def list_projects(request: Request):
 async def get_project_graph(project_id: str, request: Request):
     try:
         await verify_token(request)
-        # Mocking graph for UI
-        nodes = [
-            {"id": "src/App.jsx", "type": "file", "risk_score": 0.2},
-            {"id": "src/api/auth.js", "type": "file", "risk_score": 0.8},
-            {"id": "src/api/db.js", "type": "file", "risk_score": 0.9},
-        ]
-        edges = [
-            {"source": "src/api/auth.js", "target": "src/App.jsx"},
-            {"source": "src/api/db.js", "target": "src/App.jsx"},
-        ]
-        return {"nodes": nodes, "edges": edges}
+        project = get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        # Try to find an existing workspace
+        latest_run = get_latest_run(project_id)
+        repo_path = None
+        
+        if latest_run:
+            candidate_path = os.path.join(os.getcwd(), "workspaces", f"run_{latest_run['id']}")
+            if os.path.exists(candidate_path):
+                repo_path = candidate_path
+
+        if not repo_path:
+            # Fallback: Clone temporarily if no workspace is active
+            temp_id = str(uuid.uuid4())[:8]
+            repo_path = os.path.join(os.getcwd(), "workspaces", f"temp_graph_{temp_id}")
+            clone_repo(project['repo_url'], repo_path)
+            # We don't cleanup immediately so browser can refresh, 
+            # but ideally should have a cleanup task.
+
+        analyzer = ProjectAnalyzer(repo_path)
+        graph = analyzer.analyze()
+        return graph
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Graph analysis failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ---------------- RUN ENDPOINT ---------------- #
 
@@ -211,7 +230,8 @@ async def run_agent(
         request_body.team_name,
         request_body.leader_name,
         request_body.branch_name,
-        request_body.project_id
+        request_body.project_id,
+        request.headers.get("X-GitHub-Token")
     )
 
     return {"run_id": run_id, "status": "STARTED"}
@@ -351,7 +371,30 @@ async def get_rca(req: RCARequest, request: Request):
     try:
         await verify_token(request)
         from agents.workspace_agent import generate_rca
-        analysis = generate_rca(req.error_log)
+        
+        # Try to find recent code context if a run_id or project_id is available
+        code_context = ""
+        project = get_project(req.project_id) if hasattr(req, 'project_id') else None
+        
+        if project:
+            latest_run = get_latest_run(project['id'])
+            if latest_run:
+                repo_path = os.path.join(os.getcwd(), "workspaces", f"run_{latest_run['id']}")
+                if os.path.exists(repo_path):
+                    # Simple heuristic: find files mentioned in error log
+                    files_to_read = []
+                    for root, _, files in os.walk(repo_path):
+                        for f in files:
+                            if f in req.error_log:
+                                files_to_read.append(os.path.join(root, f))
+                    
+                    for f_path in files_to_read[:3]: # Limit to first 3 files
+                        try:
+                            with open(f_path, 'r', errors='ignore') as f:
+                                code_context += f"\nFILE: {os.path.relpath(f_path, repo_path)}\n{f.read()[:2000]}\n"
+                        except: pass
+
+        analysis = generate_rca(req.error_log, code_context=code_context)
         return analysis
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -362,11 +405,28 @@ async def get_infra(req: InfraRequest, request: Request):
         await verify_token(request)
         project = get_project(req.project_id)
         if not project:
-            raise Exception("Project not found")
-        
+            raise HTTPException(status_code=404, detail="Project not found")
+
         from agents.workspace_agent import generate_infra
+        
+        # Scrape root manifest files for better context
+        file_manifest = {}
+        target_files = ["package.json", "requirements.txt", "CMakeLists.txt", "go.mod", "pom.xml", "build.gradle", "Dockerfile"]
+        
+        latest_run = get_latest_run(project['id'])
+        if latest_run:
+            repo_path = os.path.join(os.getcwd(), "workspaces", f"run_{latest_run['id']}")
+            if os.path.exists(repo_path):
+                for tf in target_files:
+                    try:
+                        f_path = os.path.join(repo_path, tf)
+                        if os.path.exists(f_path):
+                            with open(f_path, 'r', errors='ignore') as f:
+                                file_manifest[tf] = f.read()[:5000]
+                    except: pass
+
         context = f"Project: {project['name']}, Repo: {project['repo_url']}"
-        infra = generate_infra(context)
+        infra = generate_infra(context, file_manifest=file_manifest)
         return infra
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

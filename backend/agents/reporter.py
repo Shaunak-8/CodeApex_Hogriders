@@ -6,7 +6,7 @@ from api.enums import IterationStatusEnum, parse_iteration_status
 class ReporterAgent:
     def build_results(self, run_id: str, repo_url: str, final_status: str, iterations: int, 
                       failures_log: list, fixes: list, 
-                      health_score: dict = None, causal_graph: dict = None) -> dict:
+                      health_score: dict = None, causal_graph: dict = None, branch_name: str = "main") -> dict:
         total_failures = len(failures_log)
         total_fixes = len([f for f in fixes if f.get("status") == "applied"])
         
@@ -34,7 +34,7 @@ class ReporterAgent:
             "health_score": health_score or {"before": 0, "after": 0},
             "causal_graph": causal_graph or {"nodes": [], "edges": []},
             "fixes": fixes,
-            "branch": "HOGRIDERS_AI_Fix",
+            "branch": branch_name,
             "timestamp": datetime.utcnow().isoformat()
         }
         

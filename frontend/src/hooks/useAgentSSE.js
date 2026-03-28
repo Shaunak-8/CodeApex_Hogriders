@@ -73,6 +73,18 @@ export const useAgentSSE = (runId) => {
             es.close();
             break;
 
+          case 'HEALTH_UPDATED':
+            try { setHealthScore(JSON.parse(data.message)); } catch { }
+            break;
+
+          case 'SCORE_UPDATED':
+            try { setScore(JSON.parse(data.message)); } catch { }
+            break;
+
+          case 'GRAPH_UPDATED':
+            try { setCausalGraph(JSON.parse(data.message)); } catch { }
+            break;
+
           default:
             break;
         }

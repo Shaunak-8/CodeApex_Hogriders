@@ -32,6 +32,7 @@ class WorkspaceChatRequest(BaseModel):
     prompt: str
 
 class RCARequest(BaseModel):
+    project_id: str
     error_log: str
 
 class InfraRequest(BaseModel):

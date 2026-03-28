@@ -15,7 +15,7 @@ import RepoHealthScore from '../components/RepoHealthScore';
 import CausalityGraph from '../components/CausalityGraph';
 import StatusBadge from '../components/StatusBadge';
 import { Activity, Brain, Loader, X, Layout, Search, Command, Shield, Zap, Globe, Terminal, Network } from 'lucide-react';
-import { getRootCauseAnalysis } from '../lib/api';
+import { getRootCauseAnalysis, getProjects, getProject } from '../lib/api';
 
 export default function DashboardPage() {
   const { id } = useParams();
@@ -25,7 +25,6 @@ export default function DashboardPage() {
   const status = useAgentStore(s => s.status);
   const runId = useAgentStore(s => s.runId);
   const setStatus = useAgentStore(s => s.setStatus);
-  const projectId = useAgentStore(s => s.projectId);
   const setProjectId = useAgentStore(s => s.setProjectId);
   const repoUrl = useAgentStore(s => s.repoUrl);
   const thoughts = useAgentStore(s => s.thoughts);
@@ -42,23 +41,39 @@ export default function DashboardPage() {
   const { startRun } = useAgentRun();
   useAgentSSE(runId);
 
+  // Sync project details on load or ID change
   useEffect(() => {
-    const fetchProject = async () => {
-      if (id) {
-        setProjectId(id);
+    async function syncProject() {
+      if (!id || !session?.access_token) return;
+      
+      const state = useAgentStore.getState();
+      
+      // If project changed, do a full reset
+      if (state.projectId !== id) {
+        state.reset();
+        state.setProjectId(id);
+      }
+      
+      // Fetch project metadata if missing
+      if (!state.repoUrl || state.projectId !== id) {
         try {
-          const { getProject } = await import('../lib/api');
+          // Attempt specific project fetch first (more efficient)
           const project = await getProject(id);
           if (project) {
-            useAgentStore.setState({ repoUrl: project.repo_url });
+            state.setRepoUrl(project.repo_url);
+          } else {
+            // Fallback to bulk projects if specific fetch fails
+            const data = await getProjects();
+            const p = data.projects?.find(proj => proj.id === id);
+            if (p) state.setRepoUrl(p.repo_url);
           }
         } catch (e) {
-          console.error("Failed to load project:", e);
+          console.error("Failed to sync project:", e);
         }
       }
-    };
-    fetchProject();
-  }, [id, setProjectId]);
+    }
+    syncProject();
+  }, [id, session, setProjectId]);
 
   useEffect(() => {
     if (!runId) setStatus('idle');
@@ -69,7 +84,7 @@ export default function DashboardPage() {
     setRcaLoading(true);
     try {
       const errorLogs = thoughts.filter(t => t.type === 'error').map(t => t.message).join('\n');
-      const data = await getRootCauseAnalysis(errorLogs || "Manual Analysis Requested");
+      const data = await getRootCauseAnalysis(id, errorLogs || "Manual Analysis Requested");
       setRcaData(data);
     } catch (e) {
       console.error(e);
@@ -80,10 +95,8 @@ export default function DashboardPage() {
 
   return (
     <div style={styles.page}>
-      {/* Grid Overlay */}
       <div style={styles.gridOverlay}></div>
 
-      {/* Header */}
       <header style={styles.header}>
         <div style={styles.titleSection}>
           <div style={styles.eyebrow}>
@@ -111,7 +124,6 @@ export default function DashboardPage() {
 
       <main style={styles.main}>
         <div style={styles.grid}>
-          {/* Left Column: Diagnostics */}
           <div style={styles.leftCol}>
             <div style={styles.section}>
                 <div style={styles.sectionHeader}>
@@ -148,7 +160,6 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          {/* Center Column: Live Feed */}
           <div style={styles.centerCol}>
             {rcaData && (
                 <div style={styles.rcaPanel}>
@@ -187,7 +198,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Right Column: Timeline & Arch */}
           <div style={styles.rightCol}>
             <div style={styles.section}>
                 <div style={styles.sectionHeader}>
@@ -217,7 +227,6 @@ export default function DashboardPage() {
 const styles = {
   page: { padding: '40px 60px', minHeight: '100vh', position: 'relative', overflowX: 'hidden' },
   gridOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundSize: '100px 100px', backgroundImage: 'linear-gradient(rgba(30, 30, 46, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(30, 30, 46, 0.05) 1px, transparent 1px)', pointerEvents: 'none', zIndex: 0 },
-
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 48, position: 'relative', zIndex: 10 },
   titleSection: { flex: 1 },
   eyebrow: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 },
@@ -225,25 +234,19 @@ const styles = {
   eyebrowText: { fontSize: 9, fontWeight: 800, letterSpacing: 2, color: 'var(--green)', opacity: 0.8 },
   title: { fontSize: 32, fontWeight: 800, letterSpacing: 2, marginBottom: 4 },
   sub: { fontSize: 10, color: 'var(--text-secondary)', fontFamily: "var(--font-mono)", letterSpacing: 1, opacity: 0.8 },
-
   headerRight: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 16 },
   btnGroup: { display: 'flex', gap: 12 },
   primaryBtn: { padding: '10px 20px', background: 'var(--green)', color: '#000', border: 'none', borderRadius: 2, fontWeight: 800, cursor: 'pointer', fontSize: 10, letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 10 },
   secBtn: { padding: '10px 20px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 2, fontWeight: 700, cursor: 'pointer', fontSize: 10, letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 10, transition: '0.3s' },
-
   main: { position: 'relative', zIndex: 5 },
   grid: { display: 'grid', gridTemplateColumns: '320px 1fr 340px', gap: 32 },
-  
   leftCol: { display: 'flex', flexDirection: 'column', gap: 32 },
   centerCol: { display: 'flex', flexDirection: 'column', gap: 32 },
   rightCol: { display: 'flex', flexDirection: 'column', gap: 32 },
-
   section: { display: 'flex', flexDirection: 'column', gap: 20 },
   sectionHeader: { display: 'flex', alignItems: 'center', gap: 12, borderLeft: '2px solid var(--border)', paddingLeft: 16 },
   sectionTitle: { fontSize: 10, letterSpacing: 2, color: 'var(--text-secondary)', fontWeight: 800, fontFamily: "var(--font-mono)" },
-
   rcaBtn: { padding: '16px', background: 'rgba(0, 255, 136, 0.05)', border: '1px solid rgba(0, 255, 136, 0.2)', color: 'var(--green)', borderRadius: 2, fontSize: 10, fontWeight: 800, letterSpacing: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, transition: '0.3s' },
-  
   rcaPanel: { background: 'rgba(0, 255, 136, 0.03)', border: '1px solid rgba(0, 255, 136, 0.2)', borderRadius: 2, marginBottom: 32, overflow: 'hidden' },
   rcaHeader: { padding: '16px 20px', borderBottom: '1px solid rgba(0, 255, 136, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   closeBtn: { background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' },
@@ -251,7 +254,6 @@ const styles = {
   rcaSec: { display: 'flex', flexDirection: 'column', gap: 8 },
   rcaLabel: { fontSize: 9, fontWeight: 800, color: 'var(--green)', opacity: 0.9, fontFamily: "var(--font-mono)", letterSpacing: 1 },
   rcaText: { fontSize: 13, color: '#fff', lineHeight: 1.6, fontFamily: "var(--font-code)", letterSpacing: 0.5 },
-
   graphCard: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 2, padding: 24, display: 'flex', flexDirection: 'column', gap: 20 },
 };
 

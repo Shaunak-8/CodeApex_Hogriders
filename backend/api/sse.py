@@ -55,6 +55,7 @@ async def stream(run_id: str):
                 event = await asyncio.wait_for(queue.get(), timeout=30.0)
                 yield {"data": json.dumps(event)}
                 if event.get("type") in ["RUN_COMPLETED", "RUN_FAILED", "error"]:
+                    await asyncio.sleep(1.0) # Grace period for delivery
                     break
             except asyncio.TimeoutError:
                 yield {"data": json.dumps({"type": "heartbeat", "message": "keepalive"})}
