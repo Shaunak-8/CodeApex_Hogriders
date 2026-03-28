@@ -15,11 +15,13 @@ export default function CommandCenter() {
     
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      if (data.type === 'HEARTBEAT' || !data.agent) return;
+
       setLogs(prev => [...prev.slice(-49), {
         id: Date.now(),
         time: new Date().toLocaleTimeString(),
         source: data.agent.toUpperCase(),
-        msg: data.message.toUpperCase(),
+        msg: (data.message || '').toUpperCase(),
         type: data.type === 'ISSUE_DETECTED' ? 'error' : 'info'
       }]);
     };

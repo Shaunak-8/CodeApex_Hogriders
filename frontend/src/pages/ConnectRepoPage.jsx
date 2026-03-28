@@ -12,9 +12,13 @@ export default function ConnectRepoPage() {
   const setRepoUrl = useAgentStore(s => s.setRepoUrl);
   const setProjectId = useAgentStore(s => s.setProjectId);
 
+  const [url, setUrl] = useState('');
   const [selectedRepo, setSelectedRepo] = useState(null);
   const [search, setSearch] = useState('');
   const [repos, setRepos] = useState([]);
+  const [tags, setTags] = useState([]);
+  const [tagInput, setTagInput] = useState('');
+  const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState(null);
@@ -51,22 +55,33 @@ export default function ConnectRepoPage() {
     (r.description && r.description.toLowerCase().includes(search.toLowerCase()))
   ) : [];
 
+  const handleConnect = async (repoUrl, repoName = null) => {
+    if (!repoUrl) return;
+    setUrl(repoUrl);
+    setConnected(true);
+    // If we have a repo object from the list, select it
+    const found = repos.find(r => r.html_url === repoUrl);
+    if (found) setSelectedRepo(found);
+    else setSelectedRepo({ html_url: repoUrl, name: repoName || repoUrl.split('/').pop().replace('.git', ''), private: true });
+  };
+
   const handleContinue = async () => {
-    if (!selectedRepo) return;
+    if (!url) return;
     setConnecting(true);
     setError(null);
     try {
-      // Ensure the user row exists in our DB before creating a project
+      const targetRepo = selectedRepo || { html_url: url, name: url.split('/').pop().replace('.git', ''), private: true };
+      
       await registerUser({ email: session.user?.email || '', profile_data: {} });
 
       const data = await createProject({
-        repo_url: selectedRepo.html_url,
-        name: selectedRepo.name,
-        tags: ['imported'],
-        visibility: selectedRepo.private ? 'private' : 'public'
+        repo_url: targetRepo.html_url,
+        name: targetRepo.name,
+        tags: tags.length > 0 ? tags : ['imported'],
+        visibility: targetRepo.private ? 'private' : 'public'
       });
 
-      setRepoUrl(repoUrl);
+      setRepoUrl(targetRepo.html_url);
       setProjectId(data.project.id);
       navigate('/invite');
     } catch (e) {
@@ -176,7 +191,7 @@ export default function ConnectRepoPage() {
         <button
           style={{ ...styles.nextBtn, opacity: connected ? 1 : 0.3 }}
           disabled={!connected}
-          onClick={() => navigate('/invite')}
+          onClick={handleContinue}
         >
           CONTINUE <ArrowRight size={14} />
         </button>

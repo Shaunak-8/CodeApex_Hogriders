@@ -13,9 +13,9 @@ const iconMap = {
 export default function CICDTimeline({ thoughts }) {
   return (
     <div style={styles.card}>
-      <h3 style={styles.title}>CI/CD TIMELINE</h3>
+      <h3 style={styles.title}>ORCHESTRATION_TIMELINE</h3>
       <div style={styles.list}>
-        {thoughts.length === 0 && <p style={styles.muted}>No events yet.</p>}
+        {thoughts.length === 0 && <p style={styles.muted}>WAITING_FOR_TELEMETRY...</p>}
         {thoughts.map((t, i) => {
           const meta = iconMap[t.type] || { icon: <div style={styles.defaultDot}></div>, color: '#333' };
           return (
@@ -39,9 +39,9 @@ export default function CICDTimeline({ thoughts }) {
 
 const styles = {
   card: { background: '#111118', border: '1px solid #1e1e2e', borderRadius: 16, padding: 20 },
-  title: { fontSize: 11, color: '#555', letterSpacing: 2, marginBottom: 16 },
+  title: { fontSize: 10, color: 'var(--text-secondary)', letterSpacing: 2, marginBottom: 16, fontFamily: "var(--font-mono)", fontWeight: 800 },
   list: { display: 'flex', flexDirection: 'column' },
-  muted: { color: '#333', fontSize: 11, textAlign: 'center' },
+  muted: { color: 'rgba(255, 255, 255, 0.6) !important', fontSize: 10, textAlign: 'center', padding: '20px 0', fontFamily: "var(--font-mono)", letterSpacing: 1 },
   item: { display: 'flex', gap: 14, position: 'relative', paddingBottom: 4 },
   iconWrap: { width: 28, height: 28, borderRadius: '50%', background: '#0a0a0f', border: '1px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2, flexShrink: 0 },
   line: { position: 'absolute', left: 13, top: 28, bottom: 0, width: 1, background: '#1e1e2e', zIndex: 1 },

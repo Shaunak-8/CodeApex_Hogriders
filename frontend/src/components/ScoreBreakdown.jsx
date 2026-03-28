@@ -15,8 +15,8 @@ export default function ScoreBreakdown({ score }) {
       <ResponsiveContainer width="100%" height={140}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#1a1a25" />
-          <XAxis dataKey="name" stroke="#333" fontSize={9} />
-          <YAxis stroke="#333" fontSize={9} />
+          <XAxis dataKey="name" stroke="var(--text-secondary)" fontSize={9} fontFamily="var(--font-code)" />
+          <YAxis stroke="var(--text-secondary)" fontSize={9} fontFamily="var(--font-code)" />
           <Tooltip contentStyle={{ background: '#111118', border: '1px solid #1e1e2e', fontSize: 11 }} />
           <Bar dataKey="value" radius={[4, 4, 0, 0]}>
             {data.map((entry, i) => <Cell key={i} fill={entry.color} />)}
@@ -29,5 +29,5 @@ export default function ScoreBreakdown({ score }) {
 
 const styles = {
   card: { background: '#111118', border: '1px solid #1e1e2e', borderRadius: 16, padding: 20 },
-  title: { fontSize: 11, color: '#555', letterSpacing: 2, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 },
+  title: { fontSize: 10, color: 'var(--text-secondary) !important', letterSpacing: 2, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontFamily: "var(--font-mono) !important", fontWeight: 800 },
 };

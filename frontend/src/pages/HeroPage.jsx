@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Cpu, Zap, Shield, GitBranch, ArrowRight, Network, Box, Lock, Activity, Terminal } from 'lucide-react';
-import MatrixBackground from '../components/MatrixBackground';
 
 export default function HeroPage() {
   const navigate = useNavigate();
@@ -20,7 +19,6 @@ export default function HeroPage() {
 
   return (
     <div style={styles.page}>
-      <MatrixBackground />
 
       {/* Nav */}
       <nav style={styles.nav}>
@@ -29,13 +27,13 @@ export default function HeroPage() {
           <span className="pixel-title-3d" style={{...styles.brand, fontSize: '18px !important', textShadow: '1px 1px 0 var(--green), 2px 2px 0 #000', WebkitTextStroke: '0.5px black'}}>MCLOVIN</span>
         </div>
         <div style={styles.navCenter}>
-            <span style={styles.navLink}>NETWORK</span>
-            <span style={styles.navLink}>CORE</span>
-            <span style={styles.navLink}>PROTOCOL</span>
-            <span style={styles.navLink}>DOCS</span>
+            <button style={styles.navLink} onClick={() => navigate('/network')}>NETWORK</button>
+            <button style={styles.navLink} onClick={() => navigate('/core')}>CORE</button>
+            <button style={styles.navLink} onClick={() => navigate('/protocol')}>PROTOCOL</button>
+            <button style={styles.navLink} onClick={() => navigate('/docs')}>DOCS</button>
         </div>
         <div style={styles.navRight}>
-          <span style={styles.authLink} onClick={() => navigate('/auth')}>SIGN IN</span>
+          <button style={styles.authLink} onClick={() => navigate('/auth')}>SIGN IN</button>
           <button style={styles.navBtn} onClick={() => navigate('/auth?mode=signup')}>
             SIGN UP
           </button>
@@ -45,24 +43,24 @@ export default function HeroPage() {
       {/* Hero */}
       <section style={styles.hero}>
         <div style={styles.heroContent}>
-            <div style={styles.statusBadge}>
+            <div className="text-thick" style={styles.statusBadge}>
                 <div style={styles.statusPulse}></div>
                 <span>SYSTEM ONLINE // V3.0.0</span>
             </div>
-            <h1 className="pixel-title-3d" style={styles.title}>
-            THE SELF-<br />
-            HEALING <span className="pixel-accent" style={styles.accent}>CODE</span><br />
-            <span className="pixel-accent" style={styles.accent}>MCLOVIN</span> AGENT.
+            <h1 style={styles.title}>
+              <span className="pixel-white-2d">THE SELF-</span><br />
+              <span className="pixel-white-2d">HEALING </span><span className="pixel-title-green-3d">CODE</span><br />
+              <span className="pixel-title-green-3d">MCLOVIN</span><span className="pixel-white-2d"> AGENT.</span>
             </h1>
-            <p style={styles.subtitle}>
+            <p className="text-thick" style={styles.subtitle}>
             Automated codebase optimization through decentralized orchestration. 
             Secure, low-latency, and architected for the next generation of autonomous engineering.
             </p>
             <div style={styles.ctas}>
-                <button style={styles.primaryBtn} onClick={() => navigate('/auth')}>
+                <button className="text-thick" style={styles.primaryBtn} onClick={() => navigate('/auth')}>
                     GET STARTED <ArrowRight size={16} />
                 </button>
-                <button style={styles.secondaryBtn} onClick={() => navigate('/auth')}>
+                <button className="text-thick" style={styles.secondaryBtn} onClick={() => navigate('/auth')}>
                     READ DOCUMENTATION
                 </button>
             </div>
@@ -113,7 +111,7 @@ export default function HeroPage() {
                         <span style={{...styles.moduleStatus, background: `${m.color}11`, color: m.color, borderColor: `${m.color}33`}}>{m.status}</span>
                     </div>
                     <h3 className="pixel-green-white-3d" style={styles.moduleTitle}>{m.title}</h3>
-                    <p style={styles.moduleDesc}>{m.desc}</p>
+                    <p className="text-thick" style={styles.moduleDesc}>{m.desc}</p>
                     <div style={styles.moduleMeta}>
                         {i === 0 && <span style={styles.metaLabel}>LATENCY: <span style={styles.metaVal}>4ms</span></span>}
                         {i === 1 && <span style={styles.metaLabel}>THROUGHPUT: <span style={styles.metaVal}>1.2TB/s</span></span>}
@@ -128,9 +126,14 @@ export default function HeroPage() {
       <section style={styles.latencySection}>
         <div style={styles.latencyCard}>
             <div style={styles.latencyHeader}>
-                <h3 style={styles.latTitle}>GLOBAL_LATENCY_REPORT</h3>
-                <p style={styles.latSub}>Real-time network performance across the McLovin backbone. Our proprietary Protocol-X ensures sub-10ms response times worldwide.</p>
-                <div style={styles.latLink}>VIEW FULL SYSTEM STATUS <ArrowRight size={12} /></div>
+                <h3 className="text-thick" style={styles.latTitle}>GLOBAL_LATENCY_REPORT</h3>
+                <p className="text-thick" style={styles.latSub}>Real-time network performance across the McLovin backbone. Our proprietary Protocol-X ensures sub-10ms response times worldwide.</p>
+                <button 
+                  style={styles.latLink} 
+                  onClick={() => navigate('/app/status')}
+                >
+                  VIEW FULL SYSTEM STATUS <ArrowRight size={12} />
+                </button>
             </div>
             <div style={styles.latencyGrid}>
                 {[
@@ -142,9 +145,9 @@ export default function HeroPage() {
                     <div key={i} style={styles.latRow}>
                         <div style={styles.latNode}>
                             <div style={styles.latDot}></div>
-                            <span>{l.node}</span>
+                            <span className="text-thick">{l.node}</span>
                         </div>
-                        <span style={styles.latPing}>{l.ping}</span>
+                        <span className="text-thick" style={styles.latPing}>{l.ping}</span>
                     </div>
                 ))}
             </div>
@@ -164,64 +167,13 @@ export default function HeroPage() {
       <footer style={styles.footer}>
         <div style={styles.footerBrand}>MCLOVIN</div>
         <div style={styles.footerLinks}>
-            <span>TERMINAL</span>
-            <span>LATENCY_REPORT</span>
-            <span>VAULT_STAT</span>
-            <span>SYSTEM_LOGS</span>
+            <button style={styles.footLink} onClick={() => navigate('/terminal')}>TERMINAL</button>
+            <button style={styles.footLink} onClick={() => navigate('/latency')}>LATENCY_REPORT</button>
+            <button style={styles.footLink} onClick={() => navigate('/vault')}>VAULT_STAT</button>
+            <button style={styles.footLink} onClick={() => navigate('/logs')}>SYSTEM_LOGS</button>
         </div>
         <div style={styles.footerCopy}>©2024 EDGE_APEX // TERMINAL_VELOCITY_V1.0.0</div>
       </footer>
-
-      {/* Injected 3D Pixel Styles */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-
-        .pixel-title-3d {
-          font-family: 'Press Start 2P', system-ui, -apple-system, sans-serif !important;
-          font-size: 42px !important;
-          line-height: 1.4 !important;
-          letter-spacing: -1px;
-          text-transform: uppercase;
-          color: #ffffff;
-          margin-bottom: 48px !important;
-          /* 3D Block Shadow - Primary (White text, Green shadow) */
-          text-shadow: 
-            1px 1px 0 #000,
-            -1px -1px 0 #000,
-            1px 1px 0px var(--green),
-            2px 2px 0px var(--green),
-            3px 3px 0px var(--green),
-            4px 4px 0px var(--green),
-            5px 5px 0px #000;
-        }
-
-        .pixel-green-white-3d {
-          font-family: 'Press Start 2P', system-ui !important;
-          color: var(--green) !important;
-          text-transform: uppercase;
-          font-size: 20px !important;
-          -webkit-text-stroke: 1px black;
-          text-shadow: 
-            1px 1px 0 #000,
-            -1px -1px 0 #000,
-            1px 1px 0px #ffffff,
-            2px 2px 0px #ffffff,
-            3px 3px 0px #ffffff,
-            4px 4px 0px #000 !important;
-        }
-
-        .pixel-title-3d .pixel-accent {
-          color: var(--green);
-          -webkit-text-stroke: 1px black;
-          text-shadow: 
-            1px 1px 0 #000,
-            -1px -1px 0 #000,
-            1px 1px 0px #ffffff,
-            2px 2px 0px #ffffff,
-            3px 3px 0px #ffffff,
-            4px 4px 0px #000;
-        }
-      `}</style>
     </div>
   );
 }
@@ -234,23 +186,23 @@ const styles = {
   dot: { width: 10, height: 10, background: 'var(--green)', boxShadow: '0 0 10px var(--green)', borderRadius: '2px' },
   brand: { fontSize: 18, fontWeight: 800, letterSpacing: 2, color: 'var(--green)', fontFamily: 'var(--font-heading)', WebkitTextStroke: '0.5px black' },
   navCenter: { display: 'flex', gap: 32 },
-  navLink: { fontSize: 10, fontWeight: 700, letterSpacing: 2, color: 'var(--text-secondary)', cursor: 'pointer', transition: '0.3s' },
+  navLink: { background: 'none', border: 'none', fontSize: 10, fontWeight: 700, letterSpacing: 2, color: 'var(--text-secondary)', cursor: 'pointer', transition: '0.3s', padding: 0, fontFamily: 'var(--font-heading)' },
   navRight: { display: 'flex', alignItems: 'center', gap: 24 },
-  authLink: { fontSize: 10, fontWeight: 700, letterSpacing: 2, cursor: 'pointer', color: 'var(--text-primary)' },
+  authLink: { background: 'none', border: 'none', fontSize: 10, fontWeight: 700, letterSpacing: 2, cursor: 'pointer', color: 'var(--text-primary)', padding: 0, fontFamily: 'var(--font-heading)' },
   navBtn: { background: 'var(--green)', color: '#000', border: 'none', padding: '8px 20px', borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 800, letterSpacing: 1 },
 
-  hero: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '20px 80px 100px', maxWidth: 1400, margin: '0 auto', gap: 60, position: 'relative', zIndex: 10 },
+  hero: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 80px 100px', maxWidth: 1400, margin: '0 auto', gap: 60, position: 'relative', zIndex: 10 },
   heroContent: { flex: 1 },
   statusBadge: { display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(0, 255, 136, 0.05)', padding: '6px 12px', borderRadius: 4, width: 'fit-content', marginBottom: 32, fontSize: 10, fontWeight: 700, letterSpacing: 2, color: 'var(--green)', border: '1px solid rgba(0, 255, 136, 0.1)' },
   statusPulse: { width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 8px var(--green)', animation: 'pulse 2s infinite' },
-  title: { fontSize: 72, lineHeight: 1, fontWeight: 800, letterSpacing: -2, marginBottom: 32, textShadow: '0 4px 20px rgba(0,0,0,1)' },
+  title: { fontSize: 60, lineHeight: 1.1, fontWeight: 800, letterSpacing: -1.5, marginBottom: 32, textShadow: '0 4px 20px rgba(0,0,0,1)' },
   accent: { color: 'var(--green)' },
   subtitle: { color: 'rgba(255,255,255,0.8)', fontSize: 16, maxWidth: 500, marginBottom: 48, fontFamily: "var(--font-mono)", lineHeight: 1.6, textShadow: '0 2px 10px rgba(0,0,0,1)' },
   ctas: { display: 'flex', gap: 20 },
   primaryBtn: { display: 'flex', alignItems: 'center', gap: 12, padding: '16px 32px', background: 'var(--green)', color: '#000', border: 'none', borderRadius: 4, fontWeight: 800, cursor: 'pointer', fontSize: 14 },
   secondaryBtn: { padding: '16px 32px', background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border)', color: '#fff', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 700, backdropFilter: 'blur(10px)' },
 
-  terminalContainer: { flex: 1, background: 'rgba(10, 10, 15, 0.8)', backdropFilter: 'blur(12px)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.8)', marginTop: 104 },
+  terminalContainer: { flex: 1, background: 'rgba(10, 10, 15, 0.8)', backdropFilter: 'blur(12px)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.8)' },
   terminalHeader: { padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(13, 13, 20, 0.9)' },
   terminalTitle: { fontSize: 9, color: 'var(--text-secondary)', letterSpacing: 1 },
   terminalStatus: { fontSize: 9, color: 'var(--green)', fontWeight: 700, WebkitTextStroke: '0.5px black' },
@@ -284,7 +236,7 @@ const styles = {
   latencyHeader: { flex: 1 },
   latTitle: { fontSize: 20, fontWeight: 800, marginBottom: 16, letterSpacing: 2, textShadow: '0 2px 10px rgba(0,0,0,1)' },
   latSub: { color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 1.6, marginBottom: 24, fontFamily: "var(--font-mono)" },
-  latLink: { fontSize: 10, color: 'var(--green)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', WebkitTextStroke: '0.5px black' },
+  latLink: { background: 'none', border: 'none', padding: 0, fontSize: 10, color: 'var(--green)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', WebkitTextStroke: '0.5px black', fontFamily: 'var(--font-mono)' },
   latencyGrid: { flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px 60px' },
   latRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: 12 },
   latNode: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: 600 },

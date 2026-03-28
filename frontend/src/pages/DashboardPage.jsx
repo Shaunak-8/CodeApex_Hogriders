@@ -43,8 +43,22 @@ export default function DashboardPage() {
   useAgentSSE(runId);
 
   useEffect(() => {
-    if (id && projectId !== id) setProjectId(id);
-  }, [id, projectId, setProjectId]);
+    const fetchProject = async () => {
+      if (id) {
+        setProjectId(id);
+        try {
+          const { getProject } = await import('../lib/api');
+          const project = await getProject(id);
+          if (project) {
+            useAgentStore.setState({ repoUrl: project.repo_url });
+          }
+        } catch (e) {
+          console.error("Failed to load project:", e);
+        }
+      }
+    };
+    fetchProject();
+  }, [id, setProjectId]);
 
   useEffect(() => {
     if (!runId) setStatus('idle');
@@ -76,7 +90,7 @@ export default function DashboardPage() {
             <div style={styles.dot}></div>
             <span style={styles.eyebrowText}>AUTONOMOUS_HEALING_PROTOCOL_ACTIVE</span>
           </div>
-          <h1 style={styles.title}>NODE_CONTROL // {repoUrl?.split('/').pop().replace('.git', '').toUpperCase() || 'PROJECT_' + id.substring(0,8)}</h1>
+          <h1 style={styles.title}>NODE_CONTROL // {repoUrl?.split('/').pop().replace('.git', '').toUpperCase() || 'PROJECT_' + (id ? id.substring(0,8) : '00000000')}</h1>
           <p style={styles.sub}>{repoUrl?.replace('https://github.com/', 'UPLINK://')}</p>
         </div>
         <div style={styles.headerRight}>
@@ -148,11 +162,11 @@ export default function DashboardPage() {
                     <div style={styles.rcaBody}>
                         <div style={styles.rcaSec}>
                             <h4 style={styles.rcaLabel}>ROOT_CAUSE_IDENTIFIED:</h4>
-                            <p style={styles.rcaText}>{rcaData.root_cause.toUpperCase()}</p>
+                            <p style={styles.rcaText}>{(rcaData?.root_cause || 'ANALYSIS_PENDING').toUpperCase()}</p>
                         </div>
                         <div style={styles.rcaSec}>
                             <h4 style={styles.rcaLabel}>LONG_TERM_RECOVERY_PROTOCOL:</h4>
-                            <p style={styles.rcaText}>{rcaData.long_term_fix.toUpperCase()}</p>
+                            <p style={styles.rcaText}>{(rcaData?.long_term_fix || 'STABILIZATION_REQUIRED').toUpperCase()}</p>
                         </div>
                     </div>
                 </div>
@@ -210,7 +224,7 @@ const styles = {
   dot: { width: 6, height: 6, background: 'var(--green)', boxShadow: '0 0 8px var(--green)', borderRadius: '1px' },
   eyebrowText: { fontSize: 9, fontWeight: 800, letterSpacing: 2, color: 'var(--green)', opacity: 0.8 },
   title: { fontSize: 32, fontWeight: 800, letterSpacing: 2, marginBottom: 4 },
-  sub: { fontSize: 10, color: 'var(--text-secondary)', fontFamily: "var(--font-mono)", letterSpacing: 1 },
+  sub: { fontSize: 10, color: 'var(--text-secondary)', fontFamily: "var(--font-mono)", letterSpacing: 1, opacity: 0.8 },
 
   headerRight: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 16 },
   btnGroup: { display: 'flex', gap: 12 },
@@ -235,8 +249,8 @@ const styles = {
   closeBtn: { background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' },
   rcaBody: { padding: 24, display: 'flex', flexDirection: 'column', gap: 24 },
   rcaSec: { display: 'flex', flexDirection: 'column', gap: 8 },
-  rcaLabel: { fontSize: 9, fontWeight: 800, color: 'var(--green)', opacity: 0.7, fontFamily: "var(--font-mono)" },
-  rcaText: { fontSize: 13, color: '#fff', lineHeight: 1.6, fontFamily: "var(--font-mono)", letterSpacing: 0.5 },
+  rcaLabel: { fontSize: 9, fontWeight: 800, color: 'var(--green)', opacity: 0.9, fontFamily: "var(--font-mono)", letterSpacing: 1 },
+  rcaText: { fontSize: 13, color: '#fff', lineHeight: 1.6, fontFamily: "var(--font-code)", letterSpacing: 0.5 },
 
   graphCard: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 2, padding: 24, display: 'flex', flexDirection: 'column', gap: 20 },
 };

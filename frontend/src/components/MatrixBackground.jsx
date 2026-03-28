@@ -101,6 +101,19 @@ const MatrixBackground = () => {
       height = window.innerHeight;
       canvas.width = width;
       canvas.height = height;
+      
+      // Re-initialize columns and drops for new width
+      const currentColumns = Math.floor(width / fontSize);
+      drops.length = 0;
+      activeColumns.clear();
+      for (let x = 0; x < currentColumns; x++) {
+        if (Math.random() < 0.3) {
+          drops[x] = Math.random() * -100;
+          activeColumns.add(x);
+        } else {
+          drops[x] = height + 100;
+        }
+      }
     };
 
     window.addEventListener('resize', handleResize);

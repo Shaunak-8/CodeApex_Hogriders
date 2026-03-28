@@ -33,6 +33,10 @@ export default function GlobalDashboardPage() {
       }
     }
     async function fetchHeatmap() {
+        if (!session) {
+            setLoadingHeatmap(false);
+            return;
+        }
         try {
             const data = await getHeatmapData();
             setHeatmap(data.heatmap || []);
@@ -50,14 +54,14 @@ export default function GlobalDashboardPage() {
     { title: 'ACTIVE_NODES', value: stats.projects, icon: Network, color: 'var(--cyan)', label: 'NODES_CONNECTED' },
     { title: 'UPLINK_RUNS', value: stats.runs, icon: Zap, color: 'var(--green)', label: 'TOTAL_EXECUTIONS' },
     { title: 'OPEN_ANOMALIES', value: stats.issues, icon: FileWarning, color: 'var(--red)', label: 'CRITICAL_ISSUES' },
-    { title: 'INTEGRITY_SCORE', value: '98.4%', icon: Shield, color: 'var(--green)', label: 'SYSTEM_STABILITY' },
+    { title: 'INTEGRITY_SCORE', value: 'DEMO', icon: Shield, color: 'var(--green)', label: 'PLACEHOLDER_METRIC' },
   ];
 
   return (
     <div style={styles.page}>
       <header style={styles.header}>
         <div style={styles.titleWrap}>
-            <h1 style={styles.title}>SYSTEM_COMMAND_CENTER</h1>
+            <h1 className="pixel-title-green-3d" style={{...styles.title, fontSize: '24px !important'}}>SYSTEM_COMMAND_CENTER</h1>
             <div style={styles.titleLines}></div>
         </div>
         <p style={styles.sub}>REAL_TIME_TELEMETRY // NODE_ORCHESTRATION_V3</p>
@@ -143,15 +147,15 @@ export default function GlobalDashboardPage() {
                 </div>
                 <div style={styles.diagGrid}>
                     <div style={styles.diagItem}>
-                        <span style={styles.diagLabel}>CPU_ORCHESTRATION</span>
+                        <span style={styles.diagLabel}>CPU_ORCHESTRATION [DEMO]</span>
                         <div style={styles.diagBar}><div style={{...styles.diagFill, width: '42%', background: 'var(--cyan)'}}></div></div>
                     </div>
                     <div style={styles.diagItem}>
-                        <span style={styles.diagLabel}>MEM_ALLOCATION</span>
+                        <span style={styles.diagLabel}>MEM_ALLOCATION [DEMO]</span>
                         <div style={styles.diagBar}><div style={{...styles.diagFill, width: '68%', background: 'var(--green)'}}></div></div>
                     </div>
                     <div style={styles.diagItem}>
-                        <span style={styles.diagLabel}>NET_THROUGHPUT</span>
+                        <span style={styles.diagLabel}>NET_THROUGHPUT [DEMO]</span>
                         <div style={styles.diagBar}><div style={{...styles.diagFill, width: '89%', background: 'var(--green)'}}></div></div>
                     </div>
                 </div>
@@ -179,8 +183,8 @@ const styles = {
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   cardTitle: { fontSize: 9, letterSpacing: 2, color: 'var(--text-secondary)', fontWeight: 800, fontFamily: "var(--font-mono)" },
   cardMain: { marginBottom: 16 },
-  cardValue: { fontSize: 36, fontWeight: 900, fontFamily: "var(--font-heading)", letterSpacing: -1 },
-  cardLabel: { fontSize: 8, color: 'var(--text-secondary)', fontFamily: "var(--font-mono)", marginTop: 4, opacity: 0.6 },
+  cardValue: { fontSize: 32, fontWeight: 800, fontFamily: "var(--font-mono)", letterSpacing: -0.5, color: '#fff' },
+  cardLabel: { fontSize: 8, color: 'var(--text-secondary)', fontFamily: "var(--font-mono)", marginTop: 4, opacity: 0.8, letterSpacing: 1 },
   cardGraph: { height: 2, background: 'rgba(255,255,255,0.03)', width: '100%', borderRadius: 1 },
   graphBar: { height: '100%' },
 
@@ -188,7 +192,7 @@ const styles = {
   mainCol: { display: 'flex', flexDirection: 'column', gap: 32 },
   heatmapCard: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 2, padding: 32 },
   sectionHeader: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 },
-  sectionTitle: { fontSize: 10, letterSpacing: 2, color: 'var(--text-primary)', fontWeight: 800, fontFamily: "var(--font-mono)" },
+  sectionTitle: { fontSize: 10, letterSpacing: 2, color: 'var(--text-secondary)', fontWeight: 800, fontFamily: "var(--font-mono)" },
   heatmapGrid: { display: 'flex', flexWrap: 'wrap', gap: 6, opacity: 0.9 },
   heatmapCell: { width: 14, height: 14, borderRadius: 1 },
   heatmapFooter: { marginTop: 24, display: 'flex', alignItems: 'center', gap: 16, borderTop: '1px solid var(--border)', paddingTop: 16 },
@@ -200,11 +204,11 @@ const styles = {
   diagHeader: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 },
   diagGrid: { display: 'flex', flexDirection: 'column', gap: 20 },
   diagItem: { display: 'flex', flexDirection: 'column', gap: 8 },
-  diagLabel: { fontSize: 8, color: 'var(--text-secondary)', fontFamily: "var(--font-mono)", fontWeight: 700 },
+  diagLabel: { fontSize: 8, color: 'var(--text-secondary)', fontFamily: "var(--font-mono)", fontWeight: 700, opacity: 0.8 },
   diagBar: { height: 4, background: 'rgba(255,255,255,0.03)', borderRadius: 2, overflow: 'hidden' },
   diagFill: { height: '100%', borderRadius: 2 },
 
   sideCol: { display: 'flex', flexDirection: 'column' },
-  emptyHeatmap: { position: 'relative', width: '100% '},
+  emptyHeatmap: { position: 'relative', width: '100%' },
   emptyText: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: 10, fontWeight: 900, color: 'var(--text-secondary)', letterSpacing: 3, background: 'var(--surface)', padding: '8px 16px', border: '1px solid var(--border)', zIndex: 1, fontFamily: "var(--font-mono)" }
 };

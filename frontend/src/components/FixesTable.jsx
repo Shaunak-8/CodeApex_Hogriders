@@ -4,9 +4,9 @@ import { Bug } from 'lucide-react';
 export default function FixesTable({ fixes }) {
   return (
     <div style={styles.card}>
-      <h3 style={styles.title}><Bug size={14} color="#ffaa00" /> FIXES APPLIED</h3>
+      <h3 style={styles.title}><Bug size={14} color="#ffaa00" /> PATCH_REGISTRY</h3>
       {fixes.length === 0 ? (
-        <p style={styles.muted}>No fixes applied yet.</p>
+        <p style={styles.muted}>NO_PATCHES_APPLIED_YET</p>
       ) : (
         <div style={styles.tableWrap}>
           <table style={styles.table}>
@@ -38,11 +38,11 @@ export default function FixesTable({ fixes }) {
 
 const styles = {
   card: { background: '#111118', border: '1px solid #1e1e2e', borderRadius: 16, padding: 20 },
-  title: { fontSize: 11, color: '#555', letterSpacing: 2, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 },
-  muted: { color: '#333', fontSize: 11, textAlign: 'center' },
+  title: { fontSize: 10, color: 'var(--text-secondary) !important', letterSpacing: 2, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontFamily: "var(--font-mono) !important", fontWeight: 800 },
+  muted: { color: 'rgba(255, 255, 255, 0.6) !important', fontSize: 10, textAlign: 'center', padding: '20px 0', fontFamily: "var(--font-mono)", letterSpacing: 1 },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', fontSize: 9, color: '#444', letterSpacing: 1, padding: '8px 10px', borderBottom: '1px solid #1e1e2e' },
+  th: { textAlign: 'left', fontSize: 9, color: 'var(--text-secondary)', letterSpacing: 1, padding: '8px 10px', borderBottom: '1px solid #1e1e2e', fontFamily: "var(--font-mono)", fontWeight: 800 },
   row: { borderBottom: '1px solid #0a0a0f' },
   td: { padding: '10px', fontSize: 11, color: '#888' },
   tdFile: { padding: '10px', fontSize: 11, color: '#00ff88', fontFamily: "'JetBrains Mono', monospace" },

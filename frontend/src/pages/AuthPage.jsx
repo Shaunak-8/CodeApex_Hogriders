@@ -51,7 +51,7 @@ export default function AuthPage() {
 
         <div style={styles.authBox}>
           <div style={styles.terminalHeader}>
-            <h1 style={styles.title}>{mode === 'login' ? 'LOGIN TO MCLOVIN' : 'REGISTER NODE'}</h1>
+            <h1 className="pixel-title-green-3d" style={{...styles.title, fontSize: '24px !important'}}>{mode === 'login' ? 'LOGIN TO MCLOVIN' : 'REGISTER NODE'}</h1>
             <p style={styles.subtitle}>AUTHENTICATION_PROTOCOL_V4.0</p>
           </div>
 

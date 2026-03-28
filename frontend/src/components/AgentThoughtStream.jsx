@@ -2,17 +2,17 @@ import { useRef, useEffect } from 'react';
 import { Terminal, Activity } from 'lucide-react';
 
 const agentColors = {
-  OrchestratorAgent: 'var(--green)',
-  AnalyzerAgent: 'var(--cyan)',
-  ValidatorAgent: '#ffaa00',
-  ReporterAgent: '#a855f7',
-  GitAgent: 'var(--red)',
-  PythonFixerAgent: '#3b82f6',
-  TypeFixerAgent: '#06b6d4',
-  SyntaxFixerAgent: '#f59e0b',
-  LogicFixerAgent: '#ef4444',
-  ImportFixerAgent: '#8b5cf6',
-  JSFixerAgent: '#f97316',
+  orchestratoragent: 'var(--green)',
+  analyzeragent: 'var(--cyan)',
+  validatoragent: '#ffaa00',
+  reporteragent: '#a855f7',
+  gitagent: 'var(--red)',
+  pythonfixeragent: '#3b82f6',
+  typefixeragent: '#06b6d4',
+  syntaxfixeragent: '#f59e0b',
+  logicfixeragent: '#ef4444',
+  importfixeragent: '#8b5cf6',
+  jsfixeragent: '#f97316',
 };
 
 export default function AgentThoughtStream({ thoughts }) {
@@ -38,10 +38,10 @@ export default function AgentThoughtStream({ thoughts }) {
                 <span style={styles.time}>{t.timestamp ? new Date(t.timestamp).toLocaleTimeString([], {hour12: false}) : '--:--:--'}</span>
             </div>
             <div style={styles.content}>
-                <span style={{ ...styles.agent, color: agentColors[t.agent] || 'var(--text-secondary)' }}>
-                    [{t.agent.toUpperCase()}]
+                <span style={{ ...styles.agent, color: agentColors[String(t.agent || '').toLowerCase()] || 'var(--text-secondary)' }}>
+                    [{String(t.agent || 'AGENT').toUpperCase()}]
                 </span>
-                <span style={{...styles.msg, color: t.type === 'error' ? 'var(--red)' : '#bbb'}}>{t.message.toUpperCase()}</span>
+                <span style={{...styles.msg, color: t.type === 'error' ? 'var(--red)' : '#bbb'}}>{String(t.message || '').toUpperCase()}</span>
             </div>
           </div>
         ))}
@@ -53,11 +53,11 @@ export default function AgentThoughtStream({ thoughts }) {
 
 const styles = {
   container: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 2, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%' },
-  terminal: { padding: 24, minHeight: 400, maxHeight: 600, overflowY: 'auto', fontFamily: "var(--font-mono)", background: 'rgba(0,0,0,0.4)', position: 'relative' },
+  terminal: { padding: 24, minHeight: 400, maxHeight: 600, overflowY: 'auto', fontFamily: "var(--font-code)", background: 'rgba(0,0,0,0.4)', position: 'relative' },
   scanline: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(to bottom, transparent 50%, rgba(0, 255, 136, 0.01) 50%)', backgroundSize: '100% 4px', pointerEvents: 'none', zIndex: 1 },
   
   empty: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 16, opacity: 0.3 },
-  muted: { fontSize: 9, letterSpacing: 2, fontWeight: 800, color: 'var(--text-secondary)' },
+  muted: { fontSize: 9, letterSpacing: 2, fontWeight: 800, color: 'rgba(255, 255, 255, 0.5)' },
 
   line: { display: 'flex', gap: 16, marginBottom: 10, fontSize: 11, lineHeight: 1.5, position: 'relative', zIndex: 2 },
   timeWrap: { width: 70, flexShrink: 0 },

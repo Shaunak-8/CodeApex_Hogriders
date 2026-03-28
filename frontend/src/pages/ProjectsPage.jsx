@@ -48,8 +48,8 @@ export default function ProjectsPage() {
     <div style={styles.page}>
       <header style={styles.header}>
         <div>
-          <h1 style={styles.title}>Projects</h1>
-          <p style={styles.sub}>Manage your connected repositories and CI/CD pipelines.</p>
+          <h1 className="pixel-title-green-3d" style={{...styles.title, fontSize: '24px !important'}}>Projects</h1>
+          <p className="text-thick" style={styles.sub}>Manage your connected repositories and CI/CD pipelines.</p>
         </div>
         <button style={styles.newBtn} onClick={() => navigate('/connect-repo')}>
           <Plus size={16} /> New Project
@@ -84,7 +84,7 @@ export default function ProjectsPage() {
               </div>
               
               <h3 style={styles.name}>{p.name}</h3>
-              <p style={styles.url}>{p.repo_url.replace('https://github.com/', '')}</p>
+              <p className="text-thick" style={styles.url}>{p.repo_url.replace('https://github.com/', '')}</p>
               
               <div style={styles.stats}>
                 <div style={styles.stat} title="Total Pipeline Runs">
@@ -96,7 +96,7 @@ export default function ProjectsPage() {
                   <span>{p.stats?.issues || 0}</span>
                 </div>
                 <div style={{ flex: 1 }} />
-                <div style={styles.stat}>
+                <div className="text-thick" style={styles.stat}>
                   <Calendar size={12} color="#555" />
                   <span style={{ fontSize: 10 }}>{new Date(p.created_at).toLocaleDateString()}</span>
                 </div>
@@ -119,7 +119,7 @@ const styles = {
   page: { padding: 32 },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32 },
   title: { fontSize: 24, fontWeight: 800, letterSpacing: 1, marginBottom: 8 },
-  sub: { fontSize: 13, color: '#888', fontFamily: "'JetBrains Mono', monospace" },
+  sub: { fontSize: 13, color: 'var(--text-secondary)', fontFamily: "'JetBrains Mono', monospace", opacity: 0.9 },
   newBtn: { display: 'flex', alignItems: 'center', gap: 8, background: '#00ff88', color: '#000', padding: '10px 16px', borderRadius: 8, fontWeight: 700, border: 'none', cursor: 'pointer', fontSize: 13 },
   
   center: { display: 'flex', justifyContent: 'center', padding: 60 },
@@ -128,10 +128,10 @@ const styles = {
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 24 },
   card: { background: '#0a0a0f', border: '1px solid #1e1e2e', borderRadius: 12, padding: 20, cursor: 'pointer' },
   cardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  visibility: { fontSize: 9, textTransform: 'uppercase', letterSpacing: 1, color: '#888', background: '#111118', padding: '4px 8px', borderRadius: 12 },
-  name: { fontSize: 16, fontWeight: 700, marginBottom: 4 },
-  url: { fontSize: 11, color: '#555', fontFamily: "'JetBrains Mono', monospace", marginBottom: 24, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  visibility: { fontSize: 9, textTransform: 'uppercase', letterSpacing: 1, color: 'rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: 12, fontFamily: "var(--font-mono)", fontWeight: 700 },
+  name: { fontSize: 16, fontWeight: 800, marginBottom: 8, color: 'var(--green)', fontFamily: "var(--font-mono)", letterSpacing: 1 },
+  url: { fontSize: 11, color: 'var(--text-secondary)', fontFamily: "'JetBrains Mono', monospace", marginBottom: 24, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.8 },
   
   stats: { display: 'flex', alignItems: 'center', gap: 16, borderTop: '1px solid #1e1e2e', paddingTop: 16 },
-  stat: { display: 'flex', alignItems: 'center', gap: 6, color: '#aaa', fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }
+  stat: { display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(255,255,255,0.5)', fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }
 };

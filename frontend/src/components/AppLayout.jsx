@@ -67,7 +67,7 @@ export default function AppLayout() {
                 </div>
             </div>
             <div style={styles.userDetails}>
-              <span style={styles.userName}>{user?.email?.split('@')[0].toUpperCase()}</span>
+              <span style={styles.userName}>{(user?.email ?? 'ANONYMOUS').split('@')[0].toUpperCase()}</span>
               <span style={styles.userRole}>SEC_LEVEL_04</span>
             </div>
           </div>

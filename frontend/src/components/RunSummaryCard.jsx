@@ -25,9 +25,9 @@ export default function RunSummaryCard({ status, totalFailures, totalFixes, scor
 
 const styles = {
   card: { background: '#111118', border: '1px solid #1e1e2e', borderRadius: 16, padding: 20 },
-  title: { fontSize: 11, color: '#555', letterSpacing: 2, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 },
+  title: { fontSize: 10, color: 'var(--text-secondary) !important', letterSpacing: 2, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontFamily: "var(--font-mono) !important", fontWeight: 800 },
   grid: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 },
   metricBox: { background: '#0a0a0f', border: '1px solid #1e1e2e', borderRadius: 12, padding: 16, textAlign: 'center' },
-  value: { display: 'block', fontSize: 22, fontWeight: 800 },
-  label: { display: 'block', fontSize: 8, color: '#444', letterSpacing: 2, marginTop: 6 },
+  value: { display: 'block', fontSize: 20, fontWeight: 800, fontFamily: "var(--font-mono)", color: '#fff' },
+  label: { display: 'block', fontSize: 8, color: 'var(--text-secondary) !important', letterSpacing: 2, marginTop: 6, fontFamily: "var(--font-mono)", fontWeight: 700, opacity: 0.9 },
 };
