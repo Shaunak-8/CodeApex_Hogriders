@@ -21,7 +21,7 @@ from api.sse import router as sse_router
 async def lifespan(app: FastAPI):
     from db.db import engine, Base
     from db.models import User, Project, Run, Iteration, Fix, Issue, Task
-    print("🔥 Creating tables in Neon...")
+    print("Creating tables in Neon...")
     Base.metadata.create_all(bind=engine)
     yield
 
@@ -49,7 +49,7 @@ def health_check():
 # Root
 @app.get("/")
 def root():
-    return {"message": "Backend + DB working 🚀"}
+    return {"message": "Backend + DB working"}
 
 # Run locally
 if __name__ == "__main__":

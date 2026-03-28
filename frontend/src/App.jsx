@@ -14,6 +14,7 @@ import WorkspacePage from './pages/WorkspacePage';
 import RepoVisualizerPage from './pages/RepoVisualizerPage';
 import InfrastructurePage from './pages/InfrastructurePage';
 import { useAuth } from './hooks/useAuth';
+import MatrixBackground from './components/MatrixBackground';
 
 function App() {
   const initialize = useAuth((s) => s.initialize);
@@ -24,6 +25,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <MatrixBackground />
       <Routes>
         {/* Onboarding Flow */}
         <Route path="/" element={<HeroPage />} />

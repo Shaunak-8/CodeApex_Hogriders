@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { login, signUp, loginWithGitHub } from '../lib/supabase';
-import { Github, Mail, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Github, Mail, Lock, ArrowLeft, Eye, EyeOff, Terminal, Shield, Cpu, Activity } from 'lucide-react';
 
 export default function AuthPage() {
   const navigate = useNavigate();
@@ -38,56 +38,94 @@ export default function AuthPage() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.left}>
-        <button style={styles.backBtn} onClick={() => navigate('/')}>
-          <ArrowLeft size={14} /> Back
-        </button>
-        <div style={styles.leftContent}>
-          <div style={styles.dot}></div>
-          <h1 style={styles.leftTitle}>HOGRIDERS</h1>
-          <p style={styles.leftSub}>Autonomous CI/CD Healing Agent.<br />Fix your code while you sleep.</p>
-        </div>
-      </div>
+      {/* Grid Overlay */}
+      <div style={styles.gridOverlay}></div>
 
-      <div style={styles.right}>
-        <div style={styles.formBox}>
-          <h2 style={styles.formTitle}>{mode === 'login' ? 'WELCOME BACK' : 'CREATE ACCOUNT'}</h2>
-          <p style={styles.formSub}>{mode === 'login' ? 'Sign in to your dashboard' : 'Get started with Hogriders'}</p>
+      <div style={styles.container}>
+        <div style={styles.header}>
+            <div style={styles.brandBox}>
+                <div style={styles.dot}></div>
+                <span style={styles.brand}>MCLOVIN</span>
+            </div>
+        </div>
+
+        <div style={styles.authBox}>
+          <div style={styles.terminalHeader}>
+            <h1 className="pixel-title-green-3d" style={{...styles.title, fontSize: '24px !important'}}>{mode === 'login' ? 'LOGIN TO MCLOVIN' : 'REGISTER NODE'}</h1>
+            <p style={styles.subtitle}>AUTHENTICATION_PROTOCOL_V4.0</p>
+          </div>
 
           <button style={styles.githubBtn} onClick={handleGitHub}>
-            <Github size={16} /> Continue with GitHub
+            <Terminal size={18} color="var(--green)" />
+            <span>CONTINUE WITH GITHUB</span>
           </button>
 
           <div style={styles.divider}>
             <span style={styles.divLine}></span>
-            <span style={styles.divText}>or</span>
+            <span style={styles.divText}>OR_USER_AUTH</span>
             <span style={styles.divLine}></span>
           </div>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} style={styles.form}>
             <div style={styles.inputGroup}>
-              <Mail size={14} color="#555" style={{ position: 'absolute', left: 14, top: 14 }} />
-              <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} style={styles.input} required />
+              <label style={styles.label}>TERMINAL_ID</label>
+              <div style={styles.inputWrapper}>
+                <input 
+                  type="email" 
+                  placeholder="UID-000-000" 
+                  value={email} 
+                  onChange={e => setEmail(e.target.value)} 
+                  style={styles.input} 
+                  required 
+                />
+              </div>
             </div>
+
             <div style={styles.inputGroup}>
-              <Lock size={14} color="#555" style={{ position: 'absolute', left: 14, top: 14 }} />
-              <input type={showPw ? 'text' : 'password'} placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={styles.input} required />
-              <button type="button" onClick={() => setShowPw(!showPw)} style={styles.eyeBtn}>
-                {showPw ? <EyeOff size={14} color="#555" /> : <Eye size={14} color="#555" />}
-              </button>
+              <label style={styles.label}>SEC_KEY</label>
+              <div style={styles.inputWrapper}>
+                <input 
+                  type={showPw ? 'text' : 'password'} 
+                  placeholder="••••••••••••" 
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)} 
+                  style={styles.input} 
+                  required 
+                />
+                <button type="button" onClick={() => setShowPw(!showPw)} style={styles.eyeBtn}>
+                  {showPw ? <EyeOff size={14} color="var(--text-secondary)" /> : <Eye size={14} color="var(--text-secondary)" />}
+                </button>
+              </div>
             </div>
+
             {error && <p style={styles.error}>{error}</p>}
+
             <button type="submit" disabled={loading} style={styles.submitBtn}>
-              {loading ? 'PROCESSING...' : mode === 'login' ? 'SIGN IN' : 'CREATE ACCOUNT'}
+              <Activity size={18} />
+              <span>{loading ? 'INITIALIZING...' : mode === 'login' ? 'INITIALIZE SESSION' : 'REGISTER_NODE'}</span>
             </button>
           </form>
 
-          <p style={styles.toggle}>
-            {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+          <div style={styles.toggleBox}>
             <button style={styles.toggleBtn} onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}>
-              {mode === 'login' ? 'Sign Up' : 'Sign In'}
+              [ {mode === 'login' ? 'REGISTER_NODE' : 'ACCESS_SESSION'} ]
             </button>
-          </p>
+          </div>
+
+          <div style={styles.authFooter}>
+            <div style={styles.footerItem}>
+                <span style={styles.footerLabel}>ENCRYPTION:</span>
+                <span style={styles.footerVal}>AES-256</span>
+            </div>
+            <div style={styles.footerItem}>
+                <span style={styles.footerLabel}>UPLINK:</span>
+                <span style={styles.footerVal}>ACTIVE</span>
+            </div>
+          </div>
+        </div>
+
+        <div style={styles.pageFooter}>
+            <span style={styles.statusText}>SYS_STATUS: OPERATIONAL // @2024_MCLOVIN_CORP</span>
         </div>
       </div>
     </div>
@@ -95,30 +133,44 @@ export default function AuthPage() {
 }
 
 const styles = {
-  page: { minHeight: '100vh', display: 'flex', background: '#0a0a0f', fontFamily: "'Syne', sans-serif" },
-  left: { flex: 1, background: '#080810', display: 'flex', flexDirection: 'column', padding: 40, position: 'relative', borderRight: '1px solid #1e1e2e' },
-  backBtn: { display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 12, marginBottom: 40 },
-  leftContent: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingLeft: 40 },
-  dot: { width: 10, height: 10, borderRadius: '50%', background: '#00ff88', boxShadow: '0 0 16px #00ff88', marginBottom: 20 },
-  leftTitle: { fontSize: 36, fontWeight: 900, letterSpacing: 4, marginBottom: 12 },
-  leftSub: { color: '#555', fontSize: 13, lineHeight: 1.8, fontFamily: "'JetBrains Mono', monospace" },
+  page: { minHeight: '100vh', background: 'var(--bg)', color: '#fff', fontFamily: "var(--font-heading)", position: 'relative', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' },
+  gridOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundSize: '60px 60px', backgroundImage: 'linear-gradient(rgba(30, 30, 46, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(30, 30, 46, 0.1) 1px, transparent 1px)', pointerEvents: 'none', zIndex: -1 },
 
-  right: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  formBox: { width: 380, padding: 40 },
-  formTitle: { fontSize: 22, fontWeight: 800, letterSpacing: 2, marginBottom: 8 },
-  formSub: { color: '#555', fontSize: 12, marginBottom: 32, fontFamily: "'JetBrains Mono', monospace" },
+  container: { width: '100%', maxWidth: 500, display: 'flex', flexDirection: 'column', gap: 24, padding: 20 },
+  header: { display: 'flex', justifyContent: 'flex-start', marginBottom: 20 },
+  brandBox: { display: 'flex', alignItems: 'center', gap: 12 },
+  dot: { width: 10, height: 10, background: 'var(--green)', boxShadow: '0 0 10px var(--green)', borderRadius: '2px' },
+  brand: { fontSize: 18, fontWeight: 800, letterSpacing: 3, color: 'var(--green)' },
 
-  githubBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 0', background: '#111118', border: '1px solid #1e1e2e', color: '#fff', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-  divider: { display: 'flex', alignItems: 'center', gap: 12, margin: '24px 0' },
-  divLine: { flex: 1, height: 1, background: '#1e1e2e' },
-  divText: { color: '#333', fontSize: 10, letterSpacing: 2 },
+  authBox: { background: 'var(--surface)', border: '1px solid var(--border)', padding: '60px 50px', borderRadius: 4, position: 'relative', boxShadow: '0 30px 60px rgba(0,0,0,0.5)' },
+  terminalHeader: { textAlign: 'center', marginBottom: 48 },
+  title: { fontSize: 24, fontWeight: 700, letterSpacing: 2, marginBottom: 8, color: 'var(--text-primary)' },
+  subtitle: { fontSize: 10, letterSpacing: 4, color: 'var(--text-secondary)', fontWeight: 600, fontFamily: "var(--font-mono)" },
 
-  inputGroup: { position: 'relative', marginBottom: 16 },
-  input: { width: '100%', background: '#0a0a0f', border: '1px solid #1e1e2e', borderRadius: 10, color: '#fff', padding: '12px 16px 12px 40px', fontSize: 13, outline: 'none', boxSizing: 'border-box' },
-  eyeBtn: { position: 'absolute', right: 14, top: 12, background: 'none', border: 'none', cursor: 'pointer' },
-  error: { color: '#ff3b3b', fontSize: 11, marginBottom: 12 },
-  submitBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #00ff88, #00cc6a)', color: '#000', border: 'none', borderRadius: 10, fontWeight: 800, cursor: 'pointer', fontSize: 13, letterSpacing: 1 },
+  githubBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '18px 0', background: 'transparent', border: '1px solid var(--border)', color: 'var(--green)', borderRadius: 2, cursor: 'pointer', fontSize: 12, fontWeight: 800, letterSpacing: 2, transition: '0.3s' },
+  
+  divider: { display: 'flex', alignItems: 'center', gap: 16, margin: '40px 0' },
+  divLine: { flex: 1, height: 1, background: 'rgba(255,255,255,0.05)' },
+  divText: { color: 'var(--text-secondary)', fontSize: 9, letterSpacing: 2, fontWeight: 700, fontFamily: "var(--font-mono)" },
 
-  toggle: { textAlign: 'center', color: '#555', fontSize: 12, marginTop: 24, fontFamily: "'JetBrains Mono', monospace" },
-  toggleBtn: { background: 'none', border: 'none', color: '#00ff88', cursor: 'pointer', fontSize: 12 },
+  form: { display: 'flex', flexDirection: 'column', gap: 32 },
+  inputGroup: { display: 'flex', flexDirection: 'column', gap: 10 },
+  label: { fontSize: 10, letterSpacing: 2, color: 'var(--text-secondary)', fontWeight: 700, fontFamily: "var(--font-mono)" },
+  inputWrapper: { position: 'relative' },
+  input: { width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)', padding: '16px', color: '#fff', fontSize: 14, fontFamily: "var(--font-mono)", outline: 'none', borderRadius: 2, transition: '0.3s' },
+  eyeBtn: { position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer' },
+
+  error: { color: 'var(--red)', fontSize: 11, textAlign: 'center', fontFamily: "var(--font-mono)" },
+  submitBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '20px', background: 'var(--green)', color: '#000', border: 'none', borderRadius: 4, fontWeight: 800, cursor: 'pointer', fontSize: 14, letterSpacing: 2, transition: '0.3s', marginTop: 10 },
+
+  toggleBox: { textAlign: 'center', marginTop: 40 },
+  toggleBtn: { background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 10, fontWeight: 700, letterSpacing: 2, fontFamily: "var(--font-mono)" },
+
+  authFooter: { marginTop: 60, paddingTop: 24, borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between' },
+  footerItem: { display: 'flex', gap: 8, fontSize: 9, fontFamily: "var(--font-mono)" },
+  footerLabel: { color: 'var(--text-secondary)' },
+  footerVal: { color: 'var(--text-primary)', fontWeight: 700 },
+
+  pageFooter: { textAlign: 'center', marginTop: 24 },
+  statusText: { fontSize: 10, letterSpacing: 2, color: 'var(--green)', fontWeight: 700, opacity: 0.8 }
 };

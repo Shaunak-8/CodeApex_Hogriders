@@ -26,12 +26,12 @@ export default function RepoHealthScore({ healthScore }) {
 
 const styles = {
   card: { background: '#111118', border: '1px solid #1e1e2e', borderRadius: 16, padding: 20 },
-  title: { fontSize: 11, color: '#555', letterSpacing: 2, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 },
+  title: { fontSize: 10, color: 'var(--text-secondary) !important', letterSpacing: 2, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontFamily: "var(--font-mono) !important", fontWeight: 800 },
   gaugeWrap: {},
   gaugeTrack: { height: 8, background: '#1e1e2e', borderRadius: 4, overflow: 'hidden', marginBottom: 8 },
   gaugeFill: { height: '100%', background: 'linear-gradient(to right, #ff3b3b, #00ff88)', borderRadius: 4, transition: 'width 1s ease-out' },
   labels: { display: 'flex', justifyContent: 'space-between' },
-  before: { fontSize: 10, color: '#555', fontFamily: "'JetBrains Mono', monospace" },
+  before: { fontSize: 10, color: 'var(--text-secondary)', fontFamily: "'JetBrains Mono', monospace", opacity: 0.8 },
   after: { fontSize: 10, color: '#00ff88', fontFamily: "'JetBrains Mono', monospace" },
   improvement: { textAlign: 'center', marginTop: 8, fontSize: 11, color: '#00ff88', fontWeight: 700 },
 };
