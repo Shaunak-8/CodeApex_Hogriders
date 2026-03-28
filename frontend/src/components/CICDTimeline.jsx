@@ -53,16 +53,16 @@ export default function CICDTimeline({ thoughts }) {
 
 const styles = {
   card: { background: '#111118', border: '1px solid #1e1e2e', borderRadius: 16, padding: 20 },
-  title: { fontSize: 10, color: 'var(--text-secondary)', letterSpacing: 2, marginBottom: 16, fontFamily: "var(--font-mono)", fontWeight: 800 },
+  title: { fontSize: 13, color: 'var(--text-secondary)', letterSpacing: 2, marginBottom: 16, fontFamily: "var(--font-mono)", fontWeight: 800 },
   list: { display: 'flex', flexDirection: 'column', maxHeight: 400, overflowY: 'auto' },
-  muted: { color: 'rgba(255, 255, 255, 0.6) !important', fontSize: 10, textAlign: 'center', padding: '20px 0', fontFamily: "var(--font-mono)", letterSpacing: 1 },
+  muted: { color: 'rgba(255, 255, 255, 0.6) !important', fontSize: 13, textAlign: 'center', padding: '20px 0', fontFamily: "var(--font-mono)", letterSpacing: 1 },
   item: { display: 'flex', gap: 14, position: 'relative', paddingBottom: 4 },
   iconWrap: { width: 28, height: 28, borderRadius: '50%', background: '#0a0a0f', border: '1px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2, flexShrink: 0 },
   line: { position: 'absolute', left: 13, top: 28, bottom: 0, width: 1, background: '#1e1e2e', zIndex: 1 },
   defaultDot: { width: 6, height: 6, borderRadius: '50%', background: '#333' },
   content: { flex: 1, paddingBottom: 16 },
   itemHeader: { display: 'flex', justifyContent: 'space-between', marginBottom: 2 },
-  agent: { fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" },
-  time: { fontSize: 9, color: '#333', fontFamily: "'JetBrains Mono', monospace" },
-  msg: { fontSize: 11, color: '#777', margin: 0, lineHeight: 1.5 },
+  agent: { fontSize: 13, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" },
+  time: { fontSize: 11, color: '#333', fontFamily: "'JetBrains Mono', monospace" },
+  msg: { fontSize: 14, color: '#777', margin: 0, lineHeight: 1.5 },
 };

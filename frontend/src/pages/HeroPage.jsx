@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Cpu, Zap, Shield, GitBranch, ArrowRight, Network, Box, Lock, Activity, Terminal } from 'lucide-react';
+import TypingTerminal from '../components/TypingTerminal';
 
 export default function HeroPage() {
   const navigate = useNavigate();
@@ -73,13 +74,7 @@ export default function HeroPage() {
                 <span style={styles.terminalStatus}>STATUS: OPERATING</span>
             </div>
             <div style={styles.terminalBody}>
-                <p style={styles.termLine}><span style={styles.termPrompt}>»</span> INITIALIZING_CORE_RECOVERY...</p>
-                <p style={styles.termLine}><span style={styles.termDim}>[SYSTEM]</span> ANALYZING_REPOSTRUCTURE_X</p>
-                <p style={styles.termLine}><span style={styles.termDim}>[DB]</span> FOUND_LOOSE_KEY_AT_D2f1a-98X-B</p>
-                <p style={styles.termLine}><span style={styles.termAction}>[ACTION]</span> OPTIMIZING_CACHE_LAYER_02</p>
-                <p style={styles.termLine}><span style={styles.termSuccess}>●●●</span> INJECTING_AUTO_PATCH_01</p>
-                <p style={styles.termLine}><span style={styles.termDim}>[OK]</span> INTEGRITY_CHECK_PASSED (0.003ms)</p>
-                <p style={styles.termLine}><span style={styles.termDim}>[SYSTEM]</span> MAPPING_PROX_NODES...</p>
+                <TypingTerminal />
                 <div style={styles.termPulseGrid}>
                     <div style={styles.pulseBox}></div>
                     <div style={styles.pulseBox}></div>
@@ -101,9 +96,9 @@ export default function HeroPage() {
 
         <div style={styles.moduleGrid}>
             {[
-                { icon: <Network size={22} />, title: 'MESH NETWORK', desc: 'Decentralized orchestration layer providing infinite scale and zero single-point failure architecture.', status: 'ACTIVE', color: 'var(--green)' },
-                { icon: <Cpu size={22} />, title: 'NEURAL CORE', desc: 'Self-learning algorithms that predict codebase drift and preemptively optimize execution paths.', status: 'SYNCING', color: 'var(--green)' },
-                { icon: <Shield size={22} />, title: 'VAULT PROTOCOL', desc: 'Zero-trust hardware-level encryption protecting every byte of your intellectual property.', status: 'SECURE', color: 'var(--cyan)' },
+                { icon: <img src="/assets/mclovin-icon.png" alt="Mesh" style={{ width: 42, height: 42, objectFit: 'contain', mixBlendMode: 'multiply', animation: 'float 3s ease-in-out infinite' }} />, title: 'MESH NETWORK', desc: 'Decentralized orchestration layer providing infinite scale and zero single-point failure architecture.', status: 'ACTIVE', color: 'var(--green)' },
+                { icon: <img src="/assets/mclovin-icon.png" alt="Neural" style={{ width: 42, height: 42, objectFit: 'contain', mixBlendMode: 'multiply', animation: 'float 3s ease-in-out infinite', animationDelay: '0.5s' }} />, title: 'NEURAL CORE', desc: 'Self-learning algorithms that predict codebase drift and preemptively optimize execution paths.', status: 'SYNCING', color: 'var(--green)' },
+                { icon: <img src="/assets/mclovin-icon.png" alt="Vault" style={{ width: 42, height: 42, objectFit: 'contain', mixBlendMode: 'multiply', animation: 'float 3s ease-in-out infinite', animationDelay: '1s' }} />, title: 'VAULT PROTOCOL', desc: 'Zero-trust hardware-level encryption protecting every byte of your intellectual property.', status: 'SECURE', color: 'var(--cyan)' },
             ].map((m, i) => (
                 <div key={i} style={styles.moduleCard}>
                     <div style={styles.moduleTop}>
@@ -251,6 +246,12 @@ const styles = {
   footer: { padding: '40px 80px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 10, background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' },
   footerBrand: { color: 'var(--green)', fontWeight: 800, fontSize: 16, letterSpacing: 2, WebkitTextStroke: '0.5px black' },
   footerLinks: { display: 'flex', gap: 32, fontSize: 9, fontWeight: 700, letterSpacing: 1, color: 'rgba(255,255,255,0.4)' },
-  footerCopy: { fontSize: 9, color: 'rgba(255,255,255,0.2)', fontFamily: "var(--font-mono)" }
+  footerCopy: { fontSize: 9, color: 'rgba(255,255,255,0.2)', fontFamily: "var(--font-mono)" },
+
+  // Floating animation for McLovin icons
+  '@keyframes float': {
+    '0%, 100%': { transform: 'translateY(0)' },
+    '50%': { transform: 'translateY(-8px)' },
+  }
 };
 

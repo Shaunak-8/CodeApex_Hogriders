@@ -1,155 +1,211 @@
 import os
-import git
+import subprocess
 import logging
 import re
 import time
 import random
+from typing import Optional
 from config import GITHUB_TOKEN
 
 logger = logging.getLogger(__name__)
 
-def _get_authenticated_url(url: str, token: str = None) -> str:
-    """Inject x-access-token into GitHub URL for secure authentication."""
-    effective_token = token or GITHUB_TOKEN
-    if not effective_token or not url.startswith("https://github.com/"):
-        return url
+def run_git_command(repo_path: str, cmd: list, mask_token: str = None) -> tuple:
+    """Helper to run git subprocesses with timeout and masked logging."""
+    # Mask log output if token is provided
+    log_cmd = " ".join(cmd)
+    if mask_token:
+        log_cmd = log_cmd.replace(mask_token, "****")
     
-    # Remove existing interactive auth if any
-    clean_url = re.sub(r"https://[^@]+@github.com/", "https://github.com/", url)
-    # Use the expert-recommended 'x-access-token' format
-    return clean_url.replace("https://github.com/", f"https://x-access-token:{effective_token}@github.com/")
+    logger.debug(f"[GIT EXEC] {log_cmd}")
+    
+    # CRITICAL: Build a sanitized environment that blocks macOS Keychain
+    # The system-level osxkeychain credential.helper at
+    # /Library/Developer/CommandLineTools/usr/share/git-core/gitconfig
+    # was intercepting and REPLACING our token with stale cached creds.
+    sanitized_env = os.environ.copy()
+    sanitized_env["GIT_CONFIG_NOSYSTEM"] = "1"       # Ignore system gitconfig
+    sanitized_env["GIT_TERMINAL_PROMPT"] = "0"        # No interactive prompts
+    sanitized_env["GIT_ASKPASS"] = "/bin/echo"         # Block fallback auth
+    sanitized_env.pop("GIT_ASKPASS", None)             # Actually just disable it
+    sanitized_env["GIT_ASKPASS"] = ""                  # Empty = no askpass
+    
+    try:
+        res = subprocess.run(cmd, cwd=repo_path, capture_output=True, text=True, check=True, env=sanitized_env)
+        return True, res.stdout, res.stderr
+    except subprocess.CalledProcessError as e:
+        logger.warning(f"[GIT ERROR] CMD={log_cmd} | EXIT={e.returncode} | STDERR={e.stderr.strip()}")
+        return False, e.stdout, e.stderr
+
 
 def generate_branch_name(team: str = "HOGRIDERS", leader: str = "AI") -> str:
-    """Generate a clean, GitHub-safe branch name: TEAMNAME_LEADERNAME_AI_Fix_<TIMESTAMP>."""
-    # Process team and leader names to be uppercase and alphanumeric
-    clean_team = re.sub(r'[^A-Z0-9]', '_', team.upper()).strip('_')
-    clean_leader = re.sub(r'[^A-Z0-9]', '_', leader.upper()).strip('_')
-    
+    """Requirement 4: Generate clean, uppercase branch name securely."""
+    clean_team = re.sub(r'[^A-Z0-9]', '_', team.upper()).strip('_') or "TEAM"
+    clean_leader = re.sub(r'[^A-Z0-9]', '_', leader.upper()).strip('_') or "LEADER"
     timestamp = int(time.time())
-    branch_name = f"{clean_team}_{clean_leader}_AI_Fix_{timestamp}"
-    return branch_name
+    return f"{clean_team}_{clean_leader}_AI_FIX_{timestamp}"
 
-def validate_push_permissions(repo_url: str, token: str = None) -> bool:
-    """Lightweight check for repo write permissions (currently relies on clone success + logic)."""
-    # In a real enterprise setup, we might use a HEAD request to the GitHub API /repos/{owner}/{repo}
-    # For now, we rely on the robustness of the push_with_retry logic.
-    return True
-
-def push_with_retry(repo: git.Repo, branch_name: str, token: str = None, max_retries: int = 3) -> dict:
-    """Attempt a git push with exponential backoff and automatic remote reconfiguration."""
-    origin = repo.remote(name="origin")
-    original_url = origin.url
+def prepare_repo(repo_path: str):
+    """
+    Requirement 3: Disable Credential Caching.
+    Ensures safe, clean state before pushing.
+    """
+    logger.info("[V3] Preparing repository and unsetting credentials...")
     
-    # Ensure current branch is checked out
-    current_head = repo.active_branch.name
-    logger.info(f"[DEBUG] Current HEAD: {current_head} | Target: {branch_name}")
+    # 1. Unset global helper (CRITICAL FIX)
+    run_git_command(repo_path, ["git", "config", "--global", "--unset", "credential.helper"])
+    
+    # 2. Unset local helper for good measure
+    run_git_command(repo_path, ["git", "config", "--local", "--unset", "credential.helper"])
+    
+    logger.info("[V3] Credential helpers disabled.")
 
-    for attempt in range(1, max_retries + 1):
-        try:
-            # 1. Reconfigure remote with current token (or fallback on retry 2/3)
-            current_token = token if attempt == 1 else GITHUB_TOKEN
-            auth_url = _get_authenticated_url(original_url, current_token)
-            
-            # Mask token for logging
-            masked_url = re.sub(r"https://[^@]+@", "https://***@", auth_url)
-            logger.info(f"[LOG] Attempt {attempt}/{max_retries} | Target Branch: {branch_name}")
-            logger.info(f"[LOG] Command: git push --force origin HEAD:{branch_name}")
-            logger.info(f"[LOG] Remote URL: {masked_url}")
+def commit_changes(repo_path: str, message: str) -> bool:
+    """Requirement 5: Implement clean Commit Logic."""
+    logger.info("[V3] Staging and committing changes...")
+    
+    # Stage all
+    run_git_command(repo_path, ["git", "add", "."])
+    
+    # Check if dirty
+    success, stdout, stderr = run_git_command(repo_path, ["git", "status", "--porcelain"])
+    if not stdout.strip():
+        logger.info("[V3] Nothing to commit. Tree is clean.")
+        return False
+        
+    full_message = f"[AI-AGENT] Fix applied: {message}"
+    success, out, err = run_git_command(repo_path, ["git", "commit", "-m", full_message])
+    
+    if success:
+        logger.info(f"[V3] Committed changes successfully. MSG: {full_message}")
+        return True
+    else:
+        logger.error(f"[V3] Commit failed: {err}")
+        return False
 
-            repo.git.remote('set-url', 'origin', auth_url)
-            
-            # 2. Execute push
-            # Use refspec to ensure we push the current HEAD to the target branch name
-            push_info = origin.push(refspec=f'HEAD:{branch_name}', force=True)
-            
-            for info in push_info:
-                if info.flags & git.PushInfo.ERROR:
-                    raise RuntimeError(f"Git push error flag: {info.summary}")
-            
-            logger.info(f"[SUCCESS] Pushed fixes to {branch_name} on attempt {attempt}")
-            
-            # Cleanup: Revert to original URL
-            repo.git.remote('set-url', 'origin', original_url)
-            return {"status": "success", "branch": branch_name}
+def classify_error(stderr: str) -> str:
+    """Requirement 8: Error Classification."""
+    stderr_lower = stderr.lower()
+    if "403" in stderr_lower: return "AUTH_ERROR (Forbidden)"
+    if "401" in stderr_lower: return "INVALID_TOKEN (Unauthorized)"
+    if "404" in stderr_lower: return "REPO_NOT_FOUND"
+    
+    network_indicators = ["network", "connection", "resolve host", "timed out", "unreachable"]
+    if any(ind in stderr_lower for ind in network_indicators):
+        return "NETWORK_ERROR"
+        
+    return "UNKNOWN_GIT_ERROR"
 
-        except Exception as e:
-            err_msg = str(e)
-            logger.error(f"[FAILURE] Attempt {attempt} failed: {err_msg}")
+def push_changes(repo_path: str, token: str, branch_name: str) -> dict:
+    """
+    Requirement 1, 2, 4, 6, 7: Core Fault-Tolerant Push Engine.
+    100% Subprocess. Direct URL forcing. 3-stage retries.
+    CRITICAL: ALWAYS uses GITHUB_TOKEN from config for pushing.
+    The 'token' param from the orchestrator may be a Supabase OAuth token
+    (gho_...) which does NOT have push permissions.
+    """
+    # ALWAYS use GITHUB_TOKEN from config.py for pushing - NEVER the OAuth token
+    token = GITHUB_TOKEN
+    
+    # Extract original URL safely
+    success, origin_url, err = run_git_command(repo_path, ["git", "remote", "get-url", "origin"])
+    origin_url = origin_url.strip()
+    
+    if not success or not origin_url:
+        logger.error("[V3] Could not determine origin URL. Cannot construct Auth URL.")
+        return {"status": "failed", "branch": branch_name, "attempts": 0, "error_type": "LOCAL_ERROR", "error": "No origin URL"}
+
+    # Requirement 2: Clean and Construct Auth URL
+    clean_url = re.sub(r"https://[^@]+@github.com/", "https://github.com/", origin_url)
+    if not clean_url.endswith(".git") and "github.com" in clean_url:
+        clean_url = clean_url.rstrip('/') + ".git"
+    
+    auth_url = clean_url.replace("https://github.com/", f"https://x-access-token:{token}@github.com/")
+    masked_url = re.sub(r"https://[^@]+@", "https://***@", auth_url)
+
+    for attempt in range(1, 4):
+        logger.info(f"--- [V3] Git Push Attempt {attempt}/3 ---")
+        
+        # Requirement 4: Ensure Branch Creation
+        if attempt > 1:
+            branch_name = f"{branch_name}_RETRY_{attempt}"
             
-            if attempt < max_retries:
-                # Jittered delay
-                wait_time = (2 ** attempt) + random.uniform(0, 1)
-                logger.info(f"[RETRY] Waiting {wait_time:.2f}s before next attempt...")
-                time.sleep(wait_time)
-                
-                # On retry, try to regenerate branch suffix if it's a naming conflict (optional)
-                if "already exists" in err_msg:
-                    branch_name += f"_R{attempt}"
+        logger.info(f"[V3] Checking out branch: {branch_name}")
+        run_git_command(repo_path, ["git", "checkout", "-b", branch_name])
+
+        # Requirement 6: Mandatory Logging
+        logger.info(f"[V3] PUSHING TO: {masked_url}")
+        
+        cmd = ["git", "push", "--force", auth_url, f"HEAD:{branch_name}"]
+        success, stdout, stderr = run_git_command(repo_path, cmd, mask_token=token)
+        
+        if success:
+            logger.info(f"[V3] [SUCCESS] Direct push successful on attempt {attempt}")
+            return {"status": "success", "branch": branch_name, "attempts": attempt}
+            
+        else:
+            error_type = classify_error(stderr)
+            logger.error(f"[V3] [FAILURE] Attempt {attempt} failed: {error_type} | Output: {stderr}")
+            
+            if attempt < 3:
+                # Requirement 7: Adaptive Reset before retry
+                logger.info("[V3] [RECOVERY] Executing credential purge and sleeping...")
+                prepare_repo(repo_path)
+                time.sleep((2 ** attempt) + random.uniform(0.1, 0.5))
             else:
-                # Final failure: Cleanup and report
-                try:
-                    repo.git.remote('set-url', 'origin', original_url)
-                except:
-                    pass
-                
-                status = "auth_forbidden" if "403" in err_msg else "failed"
-                return {"status": status, "error": err_msg, "branch": branch_name}
-
-def clone_repo(url: str, path: str, token: str = None):
-    auth_url = _get_authenticated_url(url, token)
-    if os.path.exists(path):
-        if not os.path.exists(os.path.join(path, ".git")):
-            if os.listdir(path):
-                raise ValueError(f"Target path exists and is not empty: path={path}")
-            return git.Repo.clone_from(auth_url, path)
-        return git.Repo(path)
-    else:
-        os.makedirs(path, exist_ok=True)
-        return git.Repo.clone_from(auth_url, path)
-
-def create_branch(repo: git.Repo, branch_name: str):
-    if branch_name in repo.heads:
-        branch = repo.heads[branch_name]
-        branch.checkout()
-    else:
-        branch = repo.create_head(branch_name)
-        branch.checkout()
-    return branch
+                return {
+                    "status": "failed",
+                    "branch": branch_name,
+                    "attempts": attempt,
+                    "error_type": error_type,
+                    "error": stderr
+                }
 
 def commit_and_push_all(repo_path: str, message: str, branch_name: str = None, token: str = None) -> dict:
-    """High-level entry point for committing and pushing fixes."""
+    """V3 Orchestration Entry Point. ALWAYS uses GITHUB_TOKEN for push."""
     try:
-        repo = git.Repo(repo_path)
+        logger.info("[V3] Initiating Senior DevOps Push Pipeline...")
+        # CRITICAL: ALWAYS use GITHUB_TOKEN from config - ignore OAuth token
+        token = GITHUB_TOKEN
         
-        # 1. Branch Generation/Checkout
         if not branch_name:
             branch_name = generate_branch_name()
+            
+        prepare_repo(repo_path)
+        commit_changes(repo_path, message)
         
-        create_branch(repo, branch_name)
-        
-        # 2. Stage and Commit
-        repo.git.add(A=True)
-        if not repo.is_dirty(untracked_files=True):
-            logger.info("Nothing to commit.")
-            return {"status": "nothing_to_commit", "branch": branch_name}
-        
-        full_message = f"[AI-AGENT] {message}"
-        commit = repo.index.commit(full_message)
-        logger.info(f"Committed changes: {commit}")
-        
-        # 3. Push with Retry logic
-        push_res = push_with_retry(repo, branch_name, token=token)
-        
-        if push_res["status"] == "success":
-            return {"status": "success", "commit": str(commit), "branch": branch_name}
-        else:
-            return {
-                "status": push_res["status"], 
-                "commit": str(commit), 
-                "branch": branch_name, 
-                "error": push_res.get("error")
-            }
+        return push_changes(repo_path, token, branch_name)
 
     except Exception as e:
-        logger.exception(f"Unexpected error in commit_and_push_all: {e}")
-        return {"status": "failed", "error": str(e)}
+        logger.exception(f"[V3] CRITICAL_SYSTEM_ERROR in push pipeline: {e}")
+        return {
+            "status": "failed",
+            "branch": branch_name or "unknown",
+            "attempts": 0,
+            "error_type": "CRITICAL_SYSTEM_ERROR",
+            "error": str(e)
+        }
+
+def clone_repo(url: str, path: str, token: str = None):
+    """V3 DevOps Cloner: Guaranteed valid clone with auth."""
+    effective_token = token or GITHUB_TOKEN
+    clean_url = re.sub(r"https://[^@]+@github.com/", "https://github.com/", url)
+    if not clean_url.endswith(".git") and "github.com" in clean_url:
+        clean_url = clean_url.rstrip('/') + ".git"
+    auth_url = clean_url.replace("https://github.com/", f"https://x-access-token:{effective_token}@github.com/")
+
+    # Sanitized env to block osxkeychain
+    sanitized_env = os.environ.copy()
+    sanitized_env["GIT_CONFIG_NOSYSTEM"] = "1"
+    sanitized_env["GIT_TERMINAL_PROMPT"] = "0"
+    sanitized_env["GIT_ASKPASS"] = ""
+
+    if os.path.exists(path):
+        if not os.path.exists(os.path.join(path, ".git")):
+            if os.listdir(path): return None
+            subprocess.run(["git", "clone", auth_url, path], check=True, env=sanitized_env)
+            return True
+        return True
+    else:
+        os.makedirs(path, exist_ok=True)
+        subprocess.run(["git", "clone", auth_url, path], check=True, env=sanitized_env)
+        return True
