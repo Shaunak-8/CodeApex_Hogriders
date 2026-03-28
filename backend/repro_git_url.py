@@ -3,9 +3,9 @@ from config import GITHUB_TOKEN
 
 def _get_authenticated_url(url: str, token: str = None) -> str:
     effective_token = token or GITHUB_TOKEN
-    if not effective_token or not url.startswith("https://github.com/"):
-        return url
     clean_url = re.sub(r"https://[^@]+@github.com/", "https://github.com/", url)
+    if not effective_token or not clean_url.startswith("https://github.com/"):
+        return clean_url
     return clean_url.replace("https://github.com/", f"https://x-access-token:{effective_token}@github.com/")
 
 def test_normalization(url, token):

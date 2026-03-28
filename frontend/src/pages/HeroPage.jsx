@@ -20,6 +20,12 @@ export default function HeroPage() {
 
   return (
     <div style={styles.page}>
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
+      `}</style>
 
       {/* Nav */}
       <nav style={styles.nav}>
@@ -248,10 +254,5 @@ const styles = {
   footerLinks: { display: 'flex', gap: 32, fontSize: 9, fontWeight: 700, letterSpacing: 1, color: 'rgba(255,255,255,0.4)' },
   footerCopy: { fontSize: 9, color: 'rgba(255,255,255,0.2)', fontFamily: "var(--font-mono)" },
 
-  // Floating animation for McLovin icons
-  '@keyframes float': {
-    '0%, 100%': { transform: 'translateY(0)' },
-    '50%': { transform: 'translateY(-8px)' },
-  }
 };
 

@@ -9,29 +9,28 @@ from config import GITHUB_TOKEN
 
 logger = logging.getLogger(__name__)
 
-def run_git_command(repo_path: str, cmd: list, mask_token: str = None) -> tuple:
+GIT_TIMEOUT = 120  # seconds
+
+def run_git_command(repo_path: str, cmd: list, mask_token: str = None, timeout: int = GIT_TIMEOUT) -> tuple:
     """Helper to run git subprocesses with timeout and masked logging."""
-    # Mask log output if token is provided
     log_cmd = " ".join(cmd)
     if mask_token:
         log_cmd = log_cmd.replace(mask_token, "****")
     
     logger.debug(f"[GIT EXEC] {log_cmd}")
     
-    # CRITICAL: Build a sanitized environment that blocks macOS Keychain
-    # The system-level osxkeychain credential.helper at
-    # /Library/Developer/CommandLineTools/usr/share/git-core/gitconfig
-    # was intercepting and REPLACING our token with stale cached creds.
+    # Sanitized environment that blocks macOS Keychain
     sanitized_env = os.environ.copy()
-    sanitized_env["GIT_CONFIG_NOSYSTEM"] = "1"       # Ignore system gitconfig
-    sanitized_env["GIT_TERMINAL_PROMPT"] = "0"        # No interactive prompts
-    sanitized_env["GIT_ASKPASS"] = "/bin/echo"         # Block fallback auth
-    sanitized_env.pop("GIT_ASKPASS", None)             # Actually just disable it
-    sanitized_env["GIT_ASKPASS"] = ""                  # Empty = no askpass
+    sanitized_env["GIT_CONFIG_NOSYSTEM"] = "1"
+    sanitized_env["GIT_TERMINAL_PROMPT"] = "0"
+    sanitized_env["GIT_ASKPASS"] = ""
     
     try:
-        res = subprocess.run(cmd, cwd=repo_path, capture_output=True, text=True, check=True, env=sanitized_env)
+        res = subprocess.run(cmd, cwd=repo_path, capture_output=True, text=True, check=True, env=sanitized_env, timeout=timeout)
         return True, res.stdout, res.stderr
+    except subprocess.TimeoutExpired:
+        logger.warning(f"[GIT TIMEOUT] CMD={log_cmd} | timeout={timeout}s")
+        return False, "", f"Command timed out after {timeout}s"
     except subprocess.CalledProcessError as e:
         logger.warning(f"[GIT ERROR] CMD={log_cmd} | EXIT={e.returncode} | STDERR={e.stderr.strip()}")
         return False, e.stdout, e.stderr
@@ -51,35 +50,40 @@ def prepare_repo(repo_path: str):
     """
     logger.info("[V3] Preparing repository and unsetting credentials...")
     
-    # 1. Unset global helper (CRITICAL FIX)
-    run_git_command(repo_path, ["git", "config", "--global", "--unset", "credential.helper"])
-    
-    # 2. Unset local helper for good measure
-    run_git_command(repo_path, ["git", "config", "--local", "--unset", "credential.helper"])
+    # Scope credential.helper override to this repo only (don't mutate global config)
+    run_git_command(repo_path, ["git", "config", "--local", "credential.helper", ""])
     
     logger.info("[V3] Credential helpers disabled.")
 
-def commit_changes(repo_path: str, message: str) -> bool:
-    """Requirement 5: Implement clean Commit Logic."""
+def commit_changes(repo_path: str, message: str):
+    """Requirement 5: Implement clean Commit Logic.
+    Returns: True on successful commit, None if tree is clean, False on error.
+    """
     logger.info("[V3] Staging and committing changes...")
     
     # Stage all
-    run_git_command(repo_path, ["git", "add", "."])
+    add_ok, _, add_err = run_git_command(repo_path, ["git", "add", "."])
+    if not add_ok:
+        logger.error(f"[V3] git add failed: {add_err}")
+        return False
     
     # Check if dirty
-    success, stdout, stderr = run_git_command(repo_path, ["git", "status", "--porcelain"])
+    status_ok, stdout, status_err = run_git_command(repo_path, ["git", "status", "--porcelain"])
+    if not status_ok:
+        logger.error(f"[V3] git status failed: {status_err}")
+        return False
     if not stdout.strip():
         logger.info("[V3] Nothing to commit. Tree is clean.")
-        return False
+        return None
         
     full_message = f"[AI-AGENT] Fix applied: {message}"
-    success, out, err = run_git_command(repo_path, ["git", "commit", "-m", full_message])
+    commit_ok, _, commit_err = run_git_command(repo_path, ["git", "commit", "-m", full_message])
     
-    if success:
+    if commit_ok:
         logger.info(f"[V3] Committed changes successfully. MSG: {full_message}")
         return True
     else:
-        logger.error(f"[V3] Commit failed: {err}")
+        logger.error(f"[V3] Commit failed: {commit_err}")
         return False
 
 def classify_error(stderr: str) -> str:
@@ -103,8 +107,11 @@ def push_changes(repo_path: str, token: str, branch_name: str) -> dict:
     The 'token' param from the orchestrator may be a Supabase OAuth token
     (gho_...) which does NOT have push permissions.
     """
-    # ALWAYS use GITHUB_TOKEN from config.py for pushing - NEVER the OAuth token
-    token = GITHUB_TOKEN
+    # Use GITHUB_TOKEN if set, otherwise fall back to the passed-in token
+    token = GITHUB_TOKEN or token
+    if not token:
+        logger.error("[V3] No GITHUB_TOKEN configured and no token provided. Cannot push.")
+        return {"status": "failed", "branch": branch_name, "attempts": 0, "error_type": "NO_TOKEN", "error": "No GitHub token available"}
     
     # Extract original URL safely
     success, origin_url, err = run_git_command(repo_path, ["git", "remote", "get-url", "origin"])
@@ -164,14 +171,19 @@ def commit_and_push_all(repo_path: str, message: str, branch_name: str = None, t
     """V3 Orchestration Entry Point. ALWAYS uses GITHUB_TOKEN for push."""
     try:
         logger.info("[V3] Initiating Senior DevOps Push Pipeline...")
-        # CRITICAL: ALWAYS use GITHUB_TOKEN from config - ignore OAuth token
-        token = GITHUB_TOKEN
+        # Use GITHUB_TOKEN if set, otherwise fall back to passed-in token
+        token = GITHUB_TOKEN or token
+        if not token:
+            return {"status": "failed", "branch": branch_name or "unknown", "attempts": 0, "error_type": "NO_TOKEN", "error": "No GitHub token available"}
         
         if not branch_name:
             branch_name = generate_branch_name()
             
         prepare_repo(repo_path)
-        commit_changes(repo_path, message)
+        commit_result = commit_changes(repo_path, message)
+        
+        if commit_result is False:
+            return {"status": "failed", "branch": branch_name, "attempts": 0, "error_type": "COMMIT_ERROR", "error": "Local git commit failed"}
         
         return push_changes(repo_path, token, branch_name)
 
@@ -187,7 +199,10 @@ def commit_and_push_all(repo_path: str, message: str, branch_name: str = None, t
 
 def clone_repo(url: str, path: str, token: str = None):
     """V3 DevOps Cloner: Guaranteed valid clone with auth."""
-    effective_token = token or GITHUB_TOKEN
+    effective_token = GITHUB_TOKEN or token
+    if not effective_token:
+        logger.error("[V3] No token available for clone.")
+        return None
     clean_url = re.sub(r"https://[^@]+@github.com/", "https://github.com/", url)
     if not clean_url.endswith(".git") and "github.com" in clean_url:
         clean_url = clean_url.rstrip('/') + ".git"
@@ -202,10 +217,10 @@ def clone_repo(url: str, path: str, token: str = None):
     if os.path.exists(path):
         if not os.path.exists(os.path.join(path, ".git")):
             if os.listdir(path): return None
-            subprocess.run(["git", "clone", auth_url, path], check=True, env=sanitized_env)
+            subprocess.run(["git", "clone", auth_url, path], check=True, env=sanitized_env, timeout=GIT_TIMEOUT)
             return True
         return True
     else:
         os.makedirs(path, exist_ok=True)
-        subprocess.run(["git", "clone", auth_url, path], check=True, env=sanitized_env)
+        subprocess.run(["git", "clone", auth_url, path], check=True, env=sanitized_env, timeout=GIT_TIMEOUT)
         return True
