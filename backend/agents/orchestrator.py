@@ -3,6 +3,7 @@ from typing import TypedDict, List, Optional
 import os
 import json
 import time
+import re
 import logging
 from groq import Groq
 import google.generativeai as genai
@@ -46,6 +47,7 @@ class AgentState(TypedDict):
     health_before: int
     health_after: int
     db_iteration_id: int
+    token: Optional[str]
 
 # ---------------- ORCHESTRATOR ---------------- #
 
@@ -124,6 +126,10 @@ class OrchestratorAgent:
             graph_data["nodes"] = [{"id": n, "status": "failing"} for n in graph_data["nodes"]]
             state["causal_graph"] = graph_data
             
+            # Live Update: Initial Graph and Health
+            emit(run_id, "OrchestratorAgent", json.dumps(graph_data), "GRAPH_UPDATED")
+            emit(run_id, "OrchestratorAgent", json.dumps({"before": state["health_before"], "after": state["health_before"]}), "HEALTH_UPDATED")
+
             # Root nodes
             state["status"] = "running"
             
@@ -131,6 +137,7 @@ class OrchestratorAgent:
             emit(run_id, "OrchestratorAgent", f"Built dependency graph. Root cause nodes: {root_nodes}", "GRAPH_BUILT")
         else:
             emit(run_id, "AnalyzerAgent", "No failures detected.", "ANALYSIS_COMPLETED")
+            emit(run_id, "OrchestratorAgent", json.dumps({"before": 100, "after": 100}), "HEALTH_UPDATED")
             
         return state
 
@@ -157,79 +164,94 @@ class OrchestratorAgent:
                 emit(run_id, "MemoryAgent", f"Skipping {file_key} — strategy already tried.", "FIX_ROUTED")
                 continue
             
-            emit(run_id, "OrchestratorAgent", f"Routing {bug_type} fix for {file_key}...", "FIX_ROUTED")
-            
-            AgentClass = self.router.route(bug_type)
-            agent = AgentClass(self.groq_client, self.context_builder, gemini_model=self.gemini_model)
-
-            
-            # Memory history
-            history = self.memory.get_context(file_key, failure.get("line", 0))
-            
-            # Blast radius
             try:
-                blast = self.dep_graph.get_blast_radius(file_key)
-            except Exception:
-                blast = 1
-            
-            fix_res = agent.fix(failure, repo_path, history)
-
-            if fix_res and fix_res.get("fixed_code"):
-                # Apply fix
-                full_path = os.path.join(repo_path, file_key)
+                emit(run_id, "OrchestratorAgent", f"Routing {bug_type} fix for {file_key}...", "FIX_ROUTED")
+                
+                AgentClass = self.router.route(bug_type, file_path=file_key)
+                agent = AgentClass(self.groq_client, self.context_builder, gemini_model=self.gemini_model)
+                
+                # Memory history
+                history = self.memory.get_context(file_key, failure.get("line", 0))
+                
+                # Blast radius
                 try:
-                    with open(full_path, "r") as f:
-                        before_code = f.read()
+                    blast = self.dep_graph.get_blast_radius(file_key)
                 except Exception:
-                    before_code = ""
-                    
-                with open(full_path, "w") as f:
-                    f.write(fix_res["fixed_code"])
+                    blast = 1
                 
-                # Confidence
-                conf = calc_confidence({
-                    "bug_type": bug_type,
-                    "lines_changed": abs(len(fix_res["fixed_code"].splitlines()) - len(before_code.splitlines())),
-                    "blast_radius": blast,
-                    "touches_imports": "import" in fix_res["fixed_code"][:200],
-                })
-                
-                fix_entry = {
-                    "file": file_key,
-                    "bug_type": bug_type,
-                    "agent": agent.specialty,
-                    "explanation": fix_res.get("explanation", ""),
-                    "confidence": conf["score"],
-                    "blast_radius": blast,
-                    "status": "applied",
-                    "before_code": before_code[:500],
-                    "fixed_code": fix_res["fixed_code"][:500],
-                }
-                # Sanitize fix entry before recording
-                fix_entry = sanitize_result(fix_entry)
-                state["fixes_applied"].append(fix_entry)
-                
-                # Record in ledger and memory
-                self.ledger.add_attempt(file_key, strategy, fix_entry["status"])
-                self.memory.record(file_key, failure.get("line", 0), strategy, fix_entry["status"])
-                
-                emit(run_id, agent.specialty + "Agent", json.dumps(fix_entry), "FIX_APPLIED")
+                fix_res = agent.fix(failure, repo_path, history)
 
-                # DB LOGGING
-                if self.db:
-                    crud.create_fix(
-                        db=self.db,
-                        run_id=run_id,
-                        iteration_id=state.get("db_iteration_id"),
-                        file_path=file_key,
-                        bug_type=bug_type,
-                        commit_message=fix_res.get("explanation", "Auto fix"),
-                        status="applied",
-                        confidence_score=conf["score"]
-                    )
-            else:
+                if fix_res and fix_res.get("fixed_code"):
+                    # Apply fix
+                    full_path = os.path.join(repo_path, file_key)
+                    try:
+                        with open(full_path, "r") as f:
+                            before_code = f.read()
+                    except Exception:
+                        before_code = ""
+                        
+                    with open(full_path, "w") as f:
+                        f.write(fix_res["fixed_code"])
+                    
+                    # Confidence
+                    conf = calc_confidence({
+                        "bug_type": bug_type,
+                        "lines_changed": abs(len(fix_res["fixed_code"].splitlines()) - len(before_code.splitlines())),
+                        "blast_radius": blast,
+                        "touches_imports": "import" in fix_res["fixed_code"][:200],
+                    })
+                    
+                    fix_entry = {
+                        "file": file_key,
+                        "bug_type": bug_type,
+                        "agent": agent.specialty,
+                        "explanation": fix_res.get("explanation", ""),
+                        "confidence": conf["score"],
+                        "blast_radius": blast,
+                        "status": "applied",
+                        "before_code": before_code[:500],
+                        "fixed_code": fix_res["fixed_code"][:500],
+                    }
+                    # Sanitize fix entry before recording
+                    fix_entry = sanitize_result(fix_entry)
+                    state["fixes_applied"].append(fix_entry)
+                    
+                    # Record in ledger and memory
+                    self.ledger.add_attempt(file_key, strategy, fix_entry["status"])
+                    self.memory.record(file_key, failure.get("line", 0), strategy, fix_entry["status"])
+                    
+                    emit(run_id, agent.specialty + "Agent", json.dumps(fix_entry), "FIX_APPLIED")
+
+                    # Live Update: Update Graph and Score progress
+                    if state.get("causal_graph"):
+                        for node in state["causal_graph"]["nodes"]:
+                            if node["id"] == file_key:
+                                node["status"] = "fixed"
+                        emit(run_id, "OrchestratorAgent", json.dumps(state["causal_graph"]), "GRAPH_UPDATED")
+                    
+                    # Dynamic score estimation
+                    current_score = {"base": 100, "speed_bonus": 0, "efficiency_penalty": 0, "total": 100 - (len(state["failures"]) - len(state["fixes_applied"])) * 5}
+                    emit(run_id, "OrchestratorAgent", json.dumps(current_score), "SCORE_UPDATED")
+
+                    # DB LOGGING
+                    if self.db:
+                        crud.create_fix(
+                            db=self.db,
+                            run_id=run_id,
+                            iteration_id=state.get("db_iteration_id"),
+                            file_path=file_key,
+                            bug_type=bug_type,
+                            commit_message=fix_res.get("explanation", "Auto fix"),
+                            status="applied",
+                            confidence_score=conf["score"]
+                        )
+                else:
+                    self.ledger.add_attempt(file_key, strategy, "failed")
+                    emit(run_id, "OrchestratorAgent", f"Failed to generate fix for {file_key}", "FIX_FAILED")
+            except Exception as e:
+                logger.error(f"Error during fix loop for {file_key}: {e}", exc_info=True)
+                emit(run_id, "OrchestratorAgent", f"Crash during fix for {file_key}: {str(e)}", "FIX_FAILED")
                 self.ledger.add_attempt(file_key, strategy, "failed")
-                emit(run_id, "OrchestratorAgent", f"Failed to generate fix for {file_key}", "FIX_FAILED")
                 
         return state
 
@@ -253,7 +275,7 @@ class OrchestratorAgent:
             run_status = "completed" if it_status == IterationStatusEnum.passed else "failed"
             crud.update_run(self.db, run_id=run_id, status=run_status)
 
-        emit(run_id, "ValidatorAgent", state["status"], "VALIDATION_DONE")
+        emit(run_id, "ValidatorAgent", f"Validation finished with status: {state['status']}", "VALIDATION_DONE")
         return state
 
     def should_retry(self, state: AgentState):
@@ -270,13 +292,35 @@ class OrchestratorAgent:
         run_id = state["run_id"]
         emit(run_id, "ReporterAgent", "Generating final report...", "COMMIT_STARTED")
         
-        # Git commit and push
+        # Git commit and push using hardened logic
         try:
-            branch_name = f"{state['team_name']}_{state['leader_name']}_AI_Fix"
-            git_ops.commit_and_push_all(state["repo_path"], "[AI-AGENT] Applied autonomous fixes", branch_name)
-            emit(run_id, "GitAgent", f"Pushed fixes to branch {branch_name}", "COMMIT_DONE")
+            team = state.get('team_name') or "HOGRIDERS"
+            leader = state.get('leader_name') or "AI"
+            
+            # Use hardened branch generator
+            branch_name = git_ops.generate_branch_name(team, leader)
+            repo_url = state["repo_url"].rstrip('/')
+            
+            # Call overhauled push logic
+            push_res = git_ops.commit_and_push_all(
+                state["repo_path"], 
+                "Applied autonomous fixes", 
+                branch_name, 
+                token=state.get("token")
+            )
+            
+            if push_res.get("status") == "success":
+                branch_url = f"{repo_url}/tree/{branch_name}"
+                emit(run_id, "GitAgent", f"SUCCESS: Pushed fixes to branch: {branch_name}", "COMMIT_DONE")
+                emit(run_id, "GitAgent", f"View changes here: {branch_url}", "COMMIT_DONE")
+            elif push_res.get("status") == "nothing_to_commit":
+                emit(run_id, "GitAgent", f"IDENTICAL: No new changes to commit.", "COMMIT_DONE")
+            else:
+                err = push_res.get("error", "Unknown push error")
+                emit(run_id, "GitAgent", f"FAILED: Git push failed after retries: {err}", "COMMIT_FAILED")
         except Exception as e:
-            emit(run_id, "GitAgent", f"Git push failed: {str(e)}", "COMMIT_FAILED")
+            logger.error(f"Git operation failed: {e}", exc_info=True)
+            emit(run_id, "GitAgent", f"CRITICAL: Git push crashed: {str(e)}", "COMMIT_FAILED")
 
         it_status = parse_iteration_status(state["status"])
         # Health after
@@ -306,7 +350,8 @@ class OrchestratorAgent:
             failures_log=state["failures"],
             fixes=state["fixes_applied"],
             health_score={"before": state.get("health_before", 0), "after": state.get("health_after", 0)},
-            causal_graph=state.get("causal_graph", {"nodes": [], "edges": []}),
+            causal_graph=state.get("causal_graph"),
+            branch_name=branch_name
         )
 
         state["results"] = results
@@ -331,7 +376,7 @@ class OrchestratorAgent:
 
     # ---------------- RUN ---------------- #
 
-    def run(self, run_id: str, repo_url: str, repo_path: str, team_name: str = "", leader_name: str = ""):
+    def run(self, run_id: str, repo_url: str, repo_path: str, team_name: str = "", leader_name: str = "", token: str = None):
         max_retries = int(os.getenv("MAX_RETRIES", 5))
         emit(run_id, "OrchestratorAgent", "Run started", "START")
 
@@ -350,7 +395,8 @@ class OrchestratorAgent:
             "causal_graph": None,
             "health_before": 0,
             "health_after": 0,
-            "db_iteration_id": 0
+            "db_iteration_id": 0,
+            "token": token
         }
 
         return self.app.invoke(initial_state)

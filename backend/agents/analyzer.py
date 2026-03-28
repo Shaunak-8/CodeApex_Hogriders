@@ -34,6 +34,10 @@ class AnalyzerAgent:
         
         _emit("Running Jest...")
         failures.extend(self._tag(linters.run_jest(repo_path), "JS"))
+
+        # 5. C++ Checks
+        _emit("Running G++ Check...")
+        failures.extend(self._tag(linters.run_gpp_check(repo_path), "SYNTAX"))
         
         # Deduplication and prioritization
         # If a line has a SyntaxError, we prioritize that over logic.
@@ -76,7 +80,7 @@ def parse_failure(raw_output: str) -> Optional[FailureRecord]:
     # Classify error
     if "TypeError" in raw_output:
         error_type = "TYPE_ERROR"
-    elif "SyntaxError" in raw_output:
+    elif "SyntaxError" in raw_output or "error:" in raw_output.lower():
         error_type = "SYNTAX"
     elif "AssertionError" in raw_output:
         error_type = "LOGIC"

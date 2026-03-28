@@ -1,3 +1,4 @@
+import React, { useEffect, useRef } from 'react';
 import { GitBranch, CheckCircle, AlertCircle, Shield, Zap, Terminal } from 'lucide-react';
 
 const iconMap = {
@@ -6,15 +7,28 @@ const iconMap = {
   FAILURE_DETECTED: { icon: <AlertCircle size={13} />, color: '#ff3b3b' },
   FIX_ROUTED: { icon: <Zap size={13} />, color: '#ffaa00' },
   FIX_APPLIED: { icon: <CheckCircle size={13} />, color: '#00ff88' },
+  VALIDATION_STARTED: { icon: <Shield size={13} />, color: '#a855f7' },
+  VALIDATION_DONE: { icon: <CheckCircle size={13} />, color: '#00ff88' },
   VALIDATION_RESULT: { icon: <Shield size={13} />, color: '#a855f7' },
+  COMMIT_STARTED: { icon: <GitBranch size={13} />, color: '#00ccff' },
+  COMMIT_DONE: { icon: <CheckCircle size={13} />, color: '#00ff88' },
+  COMMIT_FAILED: { icon: <AlertCircle size={13} />, color: '#ff3b3b' },
   RUN_COMPLETED: { icon: <CheckCircle size={13} />, color: '#00ff88' },
 };
 
 export default function CICDTimeline({ thoughts }) {
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [thoughts]);
+
   return (
     <div style={styles.card}>
       <h3 style={styles.title}>CI/CD TIMELINE</h3>
-      <div style={styles.list}>
+      <div style={styles.list} ref={scrollRef}>
         {thoughts.length === 0 && <p style={styles.muted}>No events yet.</p>}
         {thoughts.map((t, i) => {
           const meta = iconMap[t.type] || { icon: <div style={styles.defaultDot}></div>, color: '#333' };

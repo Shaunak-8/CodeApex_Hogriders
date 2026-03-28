@@ -126,3 +126,32 @@ def run_jest(path: str) -> list:
         except json.JSONDecodeError:
             pass
     return []
+
+def run_gpp_check(path: str) -> list:
+    """Run g++ -fsyntax-only on all .cpp, .cc, .h files."""
+    gpp = shutil.which("g++")
+    if not gpp:
+        return []
+    
+    failures = []
+    for root, _, files in os.walk(path):
+        for file in files:
+            if file.endswith((".cpp", ".cc", ".h", ".hpp", ".c")):
+                full_path = os.path.join(root, file)
+                rel_path = os.path.relpath(full_path, path)
+                # -fsyntax-only checks for errors without compiling to object code
+                code, stdout, stderr = _run_tool([gpp, "-fsyntax-only", rel_path], cwd=path)
+                if code != 0:
+                    # Parse stderr: file:line:col: error: message
+                    for line in stderr.splitlines():
+                        if "error:" in line.lower():
+                            parts = line.split(":", 3)
+                            if len(parts) >= 4:
+                                failures.append(_make_failure(
+                                    file=parts[0].strip(),
+                                    line=int(parts[1].strip()) if parts[1].strip().isdigit() else 0,
+                                    bug_type="SYNTAX",
+                                    msg=parts[3].strip(),
+                                    severity="high",
+                                ))
+    return failures

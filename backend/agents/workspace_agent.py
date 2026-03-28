@@ -72,15 +72,23 @@ def analyze_workspace(repo_url: str, user_prompt: str) -> WorkspaceRoadmap:
             tasks=[]
         )
 
-def generate_rca(error_log: str) -> RCAAnalysis:
+def generate_rca(error_log: str, code_context: str = "") -> RCAAnalysis:
     instructor_client, model = get_instructor_client()
-    prompt = f"Analyze the following error log and provide a detailed Root Cause Analysis:\n\n{error_log}"
+    prompt = f"""
+    Analyze the following error log and the associated code context to provide a detailed Root Cause Analysis.
+    
+    ERROR LOG:
+    {error_log}
+    
+    CODE CONTEXT:
+    {code_context}
+    """
     
     try:
         return instructor_client.chat.completions.create(
             model=model,
             response_model=RCAAnalysis,
-            messages=[{"role": "system", "content": "You are a Senior SRE."}, {"role": "user", "content": prompt}],
+            messages=[{"role": "system", "content": "You are a Senior SRE. Be specific and reference the code provided."}, {"role": "user", "content": prompt}],
             temperature=0.1
         )
     except Exception as e:
@@ -91,15 +99,26 @@ def generate_rca(error_log: str) -> RCAAnalysis:
             long_term_fix="Please check backend logs."
         )
 
-def generate_infra(repo_context: str) -> InfraConfig:
+def generate_infra(repo_context: str, file_manifest: dict = None) -> InfraConfig:
     instructor_client, model = get_instructor_client()
-    prompt = f"Based on this repository info, generate a Dockerfile and GitHub Actions workflow and specify the primary language:\n\n{repo_context}"
+    manifest_str = json.dumps(file_manifest, indent=2) if file_manifest else "No manifest provided"
+    
+    prompt = f"""
+    Based on this repository info and file contents, generate a high-performance Dockerfile and GitHub Actions workflow.
+    
+    REPOSITORY: {repo_context}
+    
+    FILE MANIFEST (Key Config Files):
+    {manifest_str}
+    
+    Output the primary language, a production-ready Dockerfile, and a CI/CD GitHub Actions workflow.
+    """
     
     try:
         return instructor_client.chat.completions.create(
             model=model,
             response_model=InfraConfig,
-            messages=[{"role": "system", "content": "You are a DevOps Engineer."}, {"role": "user", "content": prompt}],
+            messages=[{"role": "system", "content": "You are a Senior DevOps Engineer. Optimize for performance and security."}, {"role": "user", "content": prompt}],
             temperature=0.2
         )
     except Exception as e:
