@@ -14,7 +14,7 @@ import CICDTimeline from '../components/CICDTimeline';
 import RepoHealthScore from '../components/RepoHealthScore';
 import CausalityGraph from '../components/CausalityGraph';
 import StatusBadge from '../components/StatusBadge';
-import { Activity, Brain, Loader, X } from 'lucide-react';
+import { Activity, Brain, Loader, X, Layout, Search, Command, Shield, Zap, Globe, Terminal, Network } from 'lucide-react';
 import { getRootCauseAnalysis } from '../lib/api';
 
 export default function DashboardPage() {
@@ -42,13 +42,10 @@ export default function DashboardPage() {
   const { startRun } = useAgentRun();
   useAgentSSE(runId);
 
-  // Ensure the store knows which project we're on (important if user deep-links / refreshes)
   useEffect(() => {
     if (id && projectId !== id) setProjectId(id);
   }, [id, projectId, setProjectId]);
 
-  // If user navigates back to the dashboard with no active run,
-  // don't keep showing a stale FAILED badge from a previous session.
   useEffect(() => {
     if (!runId) setStatus('idle');
   }, [id, runId, setStatus]);
@@ -69,112 +66,178 @@ export default function DashboardPage() {
 
   return (
     <div style={styles.page}>
+      {/* Grid Overlay */}
+      <div style={styles.gridOverlay}></div>
+
       {/* Header */}
       <header style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Pipeline Dashboard</h1>
-          <p style={styles.sub}>{repoUrl?.replace('https://github.com/', '') || 'Project ' + id}</p>
+        <div style={styles.titleSection}>
+          <div style={styles.eyebrow}>
+            <div style={styles.dot}></div>
+            <span style={styles.eyebrowText}>AUTONOMOUS_HEALING_PROTOCOL_ACTIVE</span>
+          </div>
+          <h1 style={styles.title}>NODE_CONTROL // {repoUrl?.split('/').pop().replace('.git', '').toUpperCase() || 'PROJECT_' + id.substring(0,8)}</h1>
+          <p style={styles.sub}>{repoUrl?.replace('https://github.com/', 'UPLINK://')}</p>
         </div>
         <div style={styles.headerRight}>
-          <button style={styles.infraBtn} onClick={() => navigate(`/app/project/${id}/infra`)}>
-            Infra Assistant
-          </button>
-          <button style={styles.vizBtn} onClick={() => navigate(`/app/project/${id}/graph`)}>
-            Repo Visualizer
-          </button>
-          <button style={styles.workspaceBtn} onClick={() => navigate(`/app/workspace/${id}`)}>
-            AI Workspace
-          </button>
+          <div style={styles.btnGroup}>
+            <button style={styles.secBtn} onClick={() => navigate(`/app/project/${id}/infra`)}>
+              <Zap size={14} /> <span>INFRA_CONTROL</span>
+            </button>
+            <button style={styles.secBtn} onClick={() => navigate(`/app/project/${id}/graph`)}>
+              <Globe size={14} /> <span>REPO_SCAN</span>
+            </button>
+            <button style={styles.primaryBtn} onClick={() => navigate(`/app/workspace/${id}`)}>
+              <Command size={14} /> <span>AI_WORKSPACE</span>
+            </button>
+          </div>
           <StatusBadge status={status} />
         </div>
       </header>
 
       <main style={styles.main}>
         <div style={styles.grid}>
-          {/* Left Column */}
+          {/* Left Column: Diagnostics */}
           <div style={styles.leftCol}>
-            <InputPanel onRun={startRun} status={status} />
-            <RunSummaryCard status={status} totalFailures={totalFailures} totalFixes={totalFixes} score={score} />
-            <RepoHealthScore healthScore={healthScore} />
-            <ScoreBreakdown score={score} />
+            <div style={styles.section}>
+                <div style={styles.sectionHeader}>
+                    <Search size={14} color="var(--green)" />
+                    <span style={styles.sectionTitle}>INTEGRITY_SCANNER</span>
+                </div>
+                <InputPanel onRun={startRun} status={status} />
+            </div>
+
+            <div style={styles.section}>
+                <div style={styles.sectionHeader}>
+                    <Activity size={14} color="var(--cyan)" />
+                    <span style={styles.sectionTitle}>SESSION_METRICS</span>
+                </div>
+                <RunSummaryCard status={status} totalFailures={totalFailures} totalFixes={totalFixes} score={score} />
+            </div>
+
+            <div style={styles.section}>
+                <div style={styles.sectionHeader}>
+                    <Shield size={14} color="var(--green)" />
+                    <span style={styles.sectionTitle}>CORE_STABILITY</span>
+                </div>
+                <RepoHealthScore healthScore={healthScore} />
+                <ScoreBreakdown score={score} />
+            </div>
             
             <button 
               style={{...styles.rcaBtn, opacity: thoughts.length ? 1 : 0.5}} 
               onClick={handleRCA}
               disabled={rcaLoading || !thoughts.length}
             >
-              {rcaLoading ? <Loader size={12} className="spin" /> : <Brain size={12} />}
-              AI Root Cause Analysis
+              {rcaLoading ? <Loader size={12} className="spin" /> : <Brain size={14} />}
+              <span>POST_MORTEM_ANALYSIS</span>
             </button>
           </div>
 
-          {/* Center Column */}
+          {/* Center Column: Live Feed */}
           <div style={styles.centerCol}>
             {rcaData && (
                 <div style={styles.rcaPanel}>
                     <div style={styles.rcaHeader}>
-                        <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                            <Brain size={16} color="#00ff88" />
-                            <span style={{fontWeight: 700, letterSpacing: 1}}>AI POST-MORTEM</span>
+                        <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
+                            <Brain size={16} color="var(--green)" />
+                            <span style={{fontWeight: 800, letterSpacing: 2}}>AI_POST_MORTEM_DECRYPTED</span>
                         </div>
                         <button style={styles.closeBtn} onClick={() => setRcaData(null)}><X size={14}/></button>
                     </div>
                     <div style={styles.rcaBody}>
-                        <div style={styles.rcaSection}>
-                            <h4 style={styles.rcaLabel}>ROOT CAUSE</h4>
-                            <p style={styles.rcaText}>{rcaData.root_cause}</p>
+                        <div style={styles.rcaSec}>
+                            <h4 style={styles.rcaLabel}>ROOT_CAUSE_IDENTIFIED:</h4>
+                            <p style={styles.rcaText}>{rcaData.root_cause.toUpperCase()}</p>
                         </div>
-                        <div style={styles.rcaSection}>
-                            <h4 style={styles.rcaLabel}>LONG-TERM FIX</h4>
-                            <p style={styles.rcaText}>{rcaData.long_term_fix}</p>
+                        <div style={styles.rcaSec}>
+                            <h4 style={styles.rcaLabel}>LONG_TERM_RECOVERY_PROTOCOL:</h4>
+                            <p style={styles.rcaText}>{rcaData.long_term_fix.toUpperCase()}</p>
                         </div>
                     </div>
                 </div>
             )}
-            <AgentThoughtStream thoughts={thoughts} />
-            <FixesTable fixes={fixes} />
+            <div style={styles.section}>
+                <div style={styles.sectionHeader}>
+                    <Terminal size={14} color="var(--green)" />
+                    <span style={styles.sectionTitle}>THOUGHT_STREAM_DECRYPTED</span>
+                </div>
+                <AgentThoughtStream thoughts={thoughts} />
+            </div>
+            <div style={styles.section}>
+                <div style={styles.sectionHeader}>
+                    <Layout size={14} color="var(--cyan)" />
+                    <span style={styles.sectionTitle}>PATCH_REGISTRY</span>
+                </div>
+                <FixesTable fixes={fixes} />
+            </div>
           </div>
 
-          {/* Right Column */}
+          {/* Right Column: Timeline & Arch */}
           <div style={styles.rightCol}>
-            <CICDTimeline thoughts={thoughts} />
-            <div style={styles.card}>
-              <h3 style={styles.cardTitle}><Activity size={14} color="#00ccff" /> CAUSALITY DAG</h3>
+            <div style={styles.section}>
+                <div style={styles.sectionHeader}>
+                    <Activity size={14} color="var(--green)" />
+                    <span style={styles.sectionTitle}>ORCHESTRATION_TIMELINE</span>
+                </div>
+                <CICDTimeline thoughts={thoughts} />
+            </div>
+            <div style={styles.graphCard}>
+              <div style={styles.sectionHeader}>
+                <Network size={14} color="var(--cyan)" />
+                <span style={styles.sectionTitle}>CAUSALITY_DAG</span>
+              </div>
               <CausalityGraph graph={causalGraph} />
             </div>
           </div>
         </div>
       </main>
+      <style>{`
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
 
 const styles = {
-  page: { padding: '32px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32 },
-  title: { fontSize: 24, fontWeight: 800, letterSpacing: 1, marginBottom: 8 },
-  sub: { fontSize: 13, color: '#888', fontFamily: "'JetBrains Mono', monospace" },
-  headerRight: { display: 'flex', alignItems: 'center', gap: 14 },
-  workspaceBtn: { padding: '8px 16px', background: 'linear-gradient(135deg, #00ff88, #00ccff)', border: 'none', color: '#000', borderRadius: 8, fontWeight: 700, cursor: 'pointer', fontSize: 12 },
-  vizBtn: { padding: '8px 16px', background: 'transparent', border: '1px solid #1e1e2e', color: '#fff', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 12 },
-  infraBtn: { padding: '8px 16px', background: 'transparent', border: '1px solid #1e1e2e', color: '#fff', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 12 },
+  page: { padding: '40px 60px', minHeight: '100vh', position: 'relative', overflowX: 'hidden' },
+  gridOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundSize: '100px 100px', backgroundImage: 'linear-gradient(rgba(30, 30, 46, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(30, 30, 46, 0.05) 1px, transparent 1px)', pointerEvents: 'none', zIndex: 0 },
 
-  rcaBtn: { marginTop: 16, padding: '12px', background: '#111118', border: '1px solid #1e1e2e', color: '#00ff88', borderRadius: 12, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: '0.2s', ':hover': { borderColor: '#00ff88' } },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 48, position: 'relative', zIndex: 10 },
+  titleSection: { flex: 1 },
+  eyebrow: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 },
+  dot: { width: 6, height: 6, background: 'var(--green)', boxShadow: '0 0 8px var(--green)', borderRadius: '1px' },
+  eyebrowText: { fontSize: 9, fontWeight: 800, letterSpacing: 2, color: 'var(--green)', opacity: 0.8 },
+  title: { fontSize: 32, fontWeight: 800, letterSpacing: 2, marginBottom: 4 },
+  sub: { fontSize: 10, color: 'var(--text-secondary)', fontFamily: "var(--font-mono)", letterSpacing: 1 },
 
-  rcaPanel: { background: '#00ff8808', border: '1px solid #00ff8833', borderRadius: 16, marginBottom: 16, overflow: 'hidden' },
-  rcaHeader: { padding: '12px 16px', borderBottom: '1px solid #00ff8822', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 },
-  closeBtn: { background: 'none', border: 'none', color: '#555', cursor: 'pointer' },
-  rcaBody: { padding: 16, display: 'flex', flexDirection: 'column', gap: 12 },
-  rcaSection: { display: 'flex', flexDirection: 'column', gap: 4 },
-  rcaLabel: { fontSize: 9, fontWeight: 800, color: '#00ff88', letterSpacing: 1 },
-  rcaText: { fontSize: 12, color: '#fff', lineHeight: 1.6, fontFamily: "'JetBrains Mono', monospace" },
+  headerRight: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 16 },
+  btnGroup: { display: 'flex', gap: 12 },
+  primaryBtn: { padding: '10px 20px', background: 'var(--green)', color: '#000', border: 'none', borderRadius: 2, fontWeight: 800, cursor: 'pointer', fontSize: 10, letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 10 },
+  secBtn: { padding: '10px 20px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 2, fontWeight: 700, cursor: 'pointer', fontSize: 10, letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 10, transition: '0.3s' },
 
-  main: { maxWidth: 1500, margin: '0 auto', padding: '24px' },
-  grid: { display: 'grid', gridTemplateColumns: '300px 1fr 340px', gap: 20 },
-  leftCol: { display: 'flex', flexDirection: 'column', gap: 16 },
-  centerCol: { display: 'flex', flexDirection: 'column', gap: 16 },
-  rightCol: { display: 'flex', flexDirection: 'column', gap: 16 },
-  card: { background: '#111118', border: '1px solid #1e1e2e', borderRadius: 16, padding: 20 },
-  cardTitle: { fontSize: 11, color: '#555', letterSpacing: 2, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 },
+  main: { position: 'relative', zIndex: 5 },
+  grid: { display: 'grid', gridTemplateColumns: '320px 1fr 340px', gap: 32 },
+  
+  leftCol: { display: 'flex', flexDirection: 'column', gap: 32 },
+  centerCol: { display: 'flex', flexDirection: 'column', gap: 32 },
+  rightCol: { display: 'flex', flexDirection: 'column', gap: 32 },
+
+  section: { display: 'flex', flexDirection: 'column', gap: 20 },
+  sectionHeader: { display: 'flex', alignItems: 'center', gap: 12, borderLeft: '2px solid var(--border)', paddingLeft: 16 },
+  sectionTitle: { fontSize: 10, letterSpacing: 2, color: 'var(--text-secondary)', fontWeight: 800, fontFamily: "var(--font-mono)" },
+
+  rcaBtn: { padding: '16px', background: 'rgba(0, 255, 136, 0.05)', border: '1px solid rgba(0, 255, 136, 0.2)', color: 'var(--green)', borderRadius: 2, fontSize: 10, fontWeight: 800, letterSpacing: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, transition: '0.3s' },
+  
+  rcaPanel: { background: 'rgba(0, 255, 136, 0.03)', border: '1px solid rgba(0, 255, 136, 0.2)', borderRadius: 2, marginBottom: 32, overflow: 'hidden' },
+  rcaHeader: { padding: '16px 20px', borderBottom: '1px solid rgba(0, 255, 136, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  closeBtn: { background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' },
+  rcaBody: { padding: 24, display: 'flex', flexDirection: 'column', gap: 24 },
+  rcaSec: { display: 'flex', flexDirection: 'column', gap: 8 },
+  rcaLabel: { fontSize: 9, fontWeight: 800, color: 'var(--green)', opacity: 0.7, fontFamily: "var(--font-mono)" },
+  rcaText: { fontSize: 13, color: '#fff', lineHeight: 1.6, fontFamily: "var(--font-mono)", letterSpacing: 0.5 },
+
+  graphCard: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 2, padding: 24, display: 'flex', flexDirection: 'column', gap: 20 },
 };
 
